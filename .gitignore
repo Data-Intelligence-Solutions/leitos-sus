@@ -5,3 +5,16 @@ data/raw/ibge/censo_2022/Pessoas_52_publico.csv
 
 # Documentação de referência local
 docs/
+
+# Dados temporários do pipeline
+data/staging/
+
+# Cache do Python
+__pycache__/
+*.py[cod]
+
+# Cache de testes
+.pytest_cache/
+
+# Dados temporários do pipeline
+data/staging/
