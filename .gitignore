@@ -2,3 +2,6 @@
 # Arquivos grandes locais
 *.dbc
 data/raw/ibge/censo_2022/Pessoas_52_publico.csv
+
+# Documentação de referência local
+docs/
