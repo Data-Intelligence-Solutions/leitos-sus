@@ -1,6 +1,6 @@
 pandas==2.3.3
 pyarrow==25.0.1
-pysus==2.11.2
+#pysus==2.11.2
 openpyxl
 xlrd
 prefect==3.8.6
