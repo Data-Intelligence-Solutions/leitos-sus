@@ -17,4 +17,4 @@ __pycache__/
 .pytest_cache/
 
 # Dados temporários do pipeline
-data/staging/
+data/staging/.venv/
