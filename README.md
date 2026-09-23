@@ -19,19 +19,26 @@ Análise da demanda hospitalar em Goiás usando dados públicos do SUS (SIH e CN
 
 Requisito: Python 3.12.
 
+Todos os comandos abaixo são para o terminal **Git Bash** (Windows):
+
 ```bash
 # Criar o ambiente virtual
-python3.12 -m venv .venv
+py -3.12 -m venv .venv
 
 # Ativar o ambiente virtual
-# Linux/macOS
-source .venv/bin/activate
-# Windows
-.venv\Scripts\activate
+source .venv/Scripts/activate
+
+# Conferir a versão do Python (deve mostrar 3.12.x)
+python --version
 
 # Instalar as dependências
 pip install -r requirements.txt
+
+# Desativar o ambiente virtual quando terminar
+deactivate
 ```
+
+> Se o comando `py` não for reconhecido, use `python -m venv .venv` (desde que `python --version` mostre 3.12).
 
 ## Estrutura do projeto
 
