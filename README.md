@@ -30,6 +30,8 @@ source .venv/Scripts/activate
 pip install -r requirements.txt
 ```
 
+Para rodar os notebooks no VS Code, abra a pasta do projeto: o arquivo `.vscode/settings.json` já seleciona o Python do `.venv` e o `ipykernel` vem no `requirements.txt`, então não é preciso instalar nem escolher kernel manualmente.
+
 ```bash
 ## [ERRO] ao rodar o projeto? siga esses passos
 # Remova manualmente a pasta .venv
