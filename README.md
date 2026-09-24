@@ -19,30 +19,38 @@ Análise da demanda hospitalar em Goiás usando dados públicos do SUS (SIH e CN
 * [Datasets utilizados](#datasets-utilizados)
 * [O que ainda falta](#o-que-ainda-falta)
 
-## Como rodar o projeto
+## Como rodar o projeto (terminal GIT)
 
 Requisito: Python 3.12.
 
-Todos os comandos abaixo são para o terminal **Git Bash** (Windows):
-
 ```bash
-# Criar o ambiente virtual
+# Crie o ambiente virtual
 py -3.12 -m venv .venv
 
-# Ativar o ambiente virtual
+# Ative o ambiente virtual
 source .venv/Scripts/activate
 
-# Conferir a versão do Python (deve mostrar 3.12.x)
-python --version
-
-# Instalar as dependências
+# Instale as dependências
 pip install -r requirements.txt
-
-# Desativar o ambiente virtual quando terminar
-deactivate
 ```
 
-> Se o comando `py` não for reconhecido, use `python -m venv .venv` (desde que `python --version` mostre 3.12).
+Para rodar os notebooks no VS Code, abra a pasta do projeto: o arquivo `.vscode/settings.json` já seleciona o Python do `.venv` e o `ipykernel` vem no `requirements.txt`, então não é preciso instalar nem escolher kernel manualmente.
+
+```bash
+## [ERRO] ao rodar o projeto? siga esses passos
+# Remova manualmente a pasta .venv
+# Verifique a versão do python (precisa ser a 3.12.X)
+python --version
+
+# Crie o ambiente virtual
+py -3.12 -m venv .venv
+
+# Ative o ambiente virtual
+source .venv/Scripts/activate
+
+# Instale as dependências
+pip install -r requirements.txt
+```
 
 ## Estrutura do projeto
 
