@@ -22,6 +22,10 @@ COLUNAS_SIH = [
     "ESPEC",
     "PROC_REA",
     "CAR_INT",
+    "SEXO",
+    "IDADE",
+    "COD_IDADE",
+    "GESTAO",
 ]
 
 # Localiza os arquivos mensais do SIH
