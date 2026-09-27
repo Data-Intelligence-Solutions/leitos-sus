@@ -18,4 +18,6 @@ __pycache__/
 
 # Dados temporários do pipeline
 data/staging/
+
+# Ambiente virtual
 .venv/
