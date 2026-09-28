@@ -2,9 +2,13 @@
 
 Análise da demanda hospitalar em Goiás usando dados públicos do SUS (SIH e CNES) e do IBGE, com foco em entender onde e como as internações pressionam a rede de saúde.
 
+O produto do projeto é o **GiroSUS**: um painel no Power BI que mostra **quem ocupa os leitos do SUS em Goiás, por quanto tempo e quanto isso custa**, olhando todas as causas de internação e medindo em leito-dia. Material completo do produto (pitch, gráficos, perguntas, guia do analista e método): [`dashboard/GiroSUS_painel_ocupacao_leitos.pdf`](dashboard/GiroSUS_painel_ocupacao_leitos.pdf).
+
 ## Sumário
 
 * [Como rodar o projeto](#como-rodar-o-projeto)
+* [O produto GiroSUS](#o-produto-girosus)
+* [Modelo do Power BI (GiroSUS)](#modelo-do-power-bi-girosus)
 * [Estrutura do projeto](#estrutura-do-projeto)
 * [Fluxo dos dados](#fluxo-dos-dados)
 * [Como funciona o negócio](#como-funciona-o-negócio)
@@ -52,16 +56,136 @@ source .venv/Scripts/activate
 pip install -r requirements.txt
 ```
 
+## O produto GiroSUS
+
+<details>
+<summary>🎯 O que é e qual dor resolve</summary>
+
+Contar internações esconde o que pesa na rede: um paciente que fica 30 dias ocupa o mesmo leito que dez pacientes de 3 dias. O GiroSUS mede a rede em **leito-dia** (um paciente ocupando um leito por um dia) e mostra quem ocupa os leitos, por quanto tempo e quanto o SUS paga por eles. O nome vem de “giro de leito”, o indicador de quantas vezes um leito recebe um novo paciente.
+
+Como o SUS paga um pacote fixo por procedimento, cada dia de internação além do necessário é um leito a menos para outro paciente e um custo que o hospital banca. O painel serve para **planejar**: o dado chega com 1 a 2 meses de atraso, então ele não mostra vaga em tempo real.
+
+Para quem: diretores de hospital, Secretaria Estadual e secretarias municipais de saúde.
+</details>
+
+<details>
+<summary>📦 Base, safra e números principais</summary>
+
+* **Base:** somente SIH/SUS (`data/silver/sih_multianual.parquet`). A base de população do IBGE entra apenas para dar nome aos municípios.
+* **Safra:** competências de janeiro a dezembro de 2025, só AIH regular (IDENT = 1). O histórico de 2021 a jun/2026 fica no modelo como filtro de tendência.
+* **Números de 2025:** 457.403 internações, 1.835.227 leitos-dia, R$ 726,1 milhões pagos, permanência média de 4,0 dias, R$ 396 por leito-dia.
+
+O que o painel já mostra:
+
+* O respiratório é só a 4ª causa de internação, mas a 2ª que mais ocupa leito (12,5% dos leitos-dia e 8,9% do valor pago). O circulatório é o contrário: 11,9% dos leitos e 21% do valor.
+* Internações de mais de 15 dias são 4,4% dos pacientes e ocupam 27,3% dos leitos-dia.
+* 43,9% dos leitos-dia ficaram acima do tempo típico do procedimento. Reduzir 10% desses dias equivale a cerca de 20 mil internações a mais por ano, com os mesmos leitos.
+* Goiânia concentra 44,7% dos leitos-dia do estado, e 56,6% deles são usados por moradores de outras cidades.
+</details>
+
+<details>
+<summary>📄 Onde está cada material</summary>
+
+| Material | Onde | Para quem |
+|---|---|---|
+| Material do produto (pitch, 7 páginas do painel com gráficos, 34 perguntas, perguntas de cliente e banca, guia do analista, método) | `dashboard/GiroSUS_painel_ocupacao_leitos.pdf` | Clientes, analistas e avaliadores |
+| Análise com todos os números | `notebooks/06_analise_respiratoria.ipynb` | Analistas |
+| Tabelas do Power BI | `gerar_modelo_bi_girosus.py` → `data/gold/girosus/` | Analista de BI |
+</details>
+
+## Modelo do Power BI (GiroSUS)
+
+<details>
+<summary>▶️ Como gerar as tabelas</summary>
+
+Na raiz do projeto, com o ambiente ativo:
+
+```bash
+python gerar_modelo_bi_girosus.py
+```
+
+Leva cerca de 1 minuto. O script lê `data/silver`, aplica as regras do GiroSUS e grava as tabelas em `data/gold/girosus/`. O valor da UTI (`VAL_UTI`) ainda não está na silver, então o script o lê dos arquivos brutos de `data/raw/sih`; sem eles, só a coluna `valor_uti` fica vazia.
+
+Ao final, o script imprime a conferência da safra 2025, que precisa bater com o PDF e o notebook 06: 457.403 internações, 1.835.227 leitos-dia, R$ 726,1 milhões e 43,9% dos leitos-dia acima do típico.
+</details>
+
+<details>
+<summary>🗃️ As tabelas geradas</summary>
+
+| Arquivo | Cada linha é | Linhas |
+|---|---|---|
+| `fato_internacoes` | Uma internação (AIH regular), todas as safras | 2,2 milhões |
+| `fato_ocupacao_diaria` | Um hospital, num dia, num grupo de doença (internados, entradas, altas) | 2,0 milhões |
+| `dim_tempo` | Um dia do calendário (2020 a 2026) | 2.557 |
+| `dim_diagnostico` | Um código CID-10, com o grupo de doença | 8.327 |
+| `dim_procedimento` | Um procedimento SIGTAP | 1.586 |
+| `dim_hospital` | Um hospital (CNES) | 303 |
+| `dim_municipio_residencia` e `dim_municipio_atendimento` | Um município (mesma tabela, uma para cada lado da relação) | 2.362 |
+
+Todas saem em `.parquet`. As tabelas `dim_diagnostico`, `dim_procedimento`, `dim_hospital` e `dim_municipio_residencia` também saem em `.csv`. Em `dim_hospital.csv` e `dim_procedimento.csv` há colunas de nome em branco (`nome_hospital` e `nome_procedimento`) para preencher à mão, pela consulta pública do CNES e pela tabela SIGTAP.
+
+A `fato_internacoes.parquet` tem mais de 40 MB. Avalie com o grupo se ela deve ir para o Git ou ser gerada por cada pessoa.
+</details>
+
+<details>
+<summary>📖 Dicionário de dados da fato_internacoes</summary>
+
+| Coluna | O que é | Origem no SIH / regra |
+|---|---|---|
+| `chave_aih` | Número da internação | N_AIH |
+| `safra` | Ano de apresentação para pagamento (filtro principal: 2025) | ANO_CMPT |
+| `competencia` | Mês de apresentação (1º dia do mês) | ANO_CMPT + MES_CMPT |
+| `data_internacao` / `data_saida` | Entrada e saída do paciente | DT_INTER / DT_SAIDA |
+| `cnes` | Hospital | CNES |
+| `munic_residencia` / `munic_atendimento` | Onde o paciente mora / onde fica o hospital | MUNIC_RES / MUNIC_MOV |
+| `cid` | Diagnóstico principal | DIAG_PRINC |
+| `proc_rea` | Procedimento realizado | PROC_REA |
+| `leito_dias` | Dias de internação = leitos-dia | DIAS_PERM |
+| `tempo_tipico` | Mediana de dias do mesmo procedimento na mesma safra | mediana(DIAS_PERM) |
+| `dias_acima_tipico` | Dias além do tempo típico | max(0, leito_dias − tempo_tipico) |
+| `faixa_duracao` / `ordem_faixa` | 0 dia, 1–3, 4–7, 8–15, 16–30, > 30 / ordem para classificar | leito_dias |
+| `fl_fora_municipio` | 1 = internado fora do município onde mora | MUNIC_RES ≠ MUNIC_MOV |
+| `fl_uti` / `dias_uti` | Passou pela UTI / dias de UTI | UTI_MES_TO |
+| `valor_pago` | Valor pago pelo SUS (não é o custo real do hospital) | VAL_TOT |
+| `valor_uti` | Parte do valor paga pela UTI | VAL_UTI (arquivos brutos) |
+
+As demais tabelas estão descritas no guia do analista do PDF (páginas 20 e 21).
+</details>
+
+<details>
+<summary>🔗 Relacionamentos e montagem no Power BI</summary>
+
+Relacionamentos (todos 1 para muitos e ativos):
+
+* `dim_tempo[data]` → `fato_internacoes[data_internacao]` e `fato_ocupacao_diaria[data]`
+* `dim_hospital[cnes]` → `fato_internacoes[cnes]` e `fato_ocupacao_diaria[cnes]`
+* `dim_diagnostico[cid]` → `fato_internacoes[cid]`
+* `dim_procedimento[proc_rea]` → `fato_internacoes[proc_rea]`
+* `dim_municipio_residencia[codigo]` → `fato_internacoes[munic_residencia]`
+* `dim_municipio_atendimento[codigo]` → `fato_internacoes[munic_atendimento]`
+
+Depois de importar:
+
+* Marque `dim_tempo` como tabela de datas.
+* Classifique `nome_mes` por `mes`, `nome_dia` por `dia_semana` e `faixa_duracao` por `ordem_faixa`.
+* Use filtro `fato_internacoes[safra] = 2025` nas páginas 1 a 6, e `dim_tempo[ano] = 2025` na página do calendário, porque a safra não filtra a tabela de ocupação.
+* Crie o parâmetro **Redução %** (de 0,05 a 0,30).
+
+As medidas DAX (22) e o mapa de cada gráfico (visual, colunas, medida e filtro) estão no PDF, nas páginas 22 a 24.
+</details>
+
 ## Estrutura do projeto
 
 ```
 leitos-sus/
-├── 📊 dashboard/         # Dashboard / visualização final (em construção)
+├── 📊 dashboard/         # Painel GiroSUS: GiroSUS_painel_ocupacao_leitos.pdf (especificação e material do produto)
 ├── 🗂️ data/
 │   ├── raw/               # Dados de origem: SIH e CNES em Parquet (convertidos do DBC), IBGE em planilhas
 │   ├── staging/           # Saída do pipeline (gerada localmente, não vai para o Git)
-│   └── silver/            # Bases consolidadas e validadas, usadas nas análises
-├── 📓 notebooks/         # Jupyter notebooks de exploração e análise
+│   ├── silver/            # Bases consolidadas e validadas, usadas nas análises
+│   └── gold/girosus/      # Tabelas prontas para o Power BI (geradas por gerar_modelo_bi_girosus.py)
+├── 🧭 modelagem_bi/      # Documentos de apoio da modelagem (versões anteriores e estudos de produto)
+├── 📓 notebooks/         # Jupyter notebooks de exploração e análise (06 = análise do GiroSUS)
 ├── 🐍 src/
 │   ├── config.py           # Caminhos e parâmetros do projeto
 │   ├── pipeline.py          # Execução local do pipeline (ETL)
@@ -69,6 +193,7 @@ leitos-sus/
 │   ├── transform/           # Tratamento e padronização dos dados
 │   └── orchestration/      # Orquestração do pipeline com Prefect
 ├── ✅ tests/             # Testes automatizados (pytest)
+├── gerar_modelo_bi_girosus.py  # Gera as tabelas do Power BI em data/gold/girosus
 ├── requirements.txt       # Dependências do projeto
 └── README.md
 ```
@@ -90,6 +215,15 @@ IBGE (.xls/.xlsx) ───────────▶  data/raw/ibge
                                      │
                                      ▼
                       notebooks 05 e 06 (análises)
+                                     │
+                                     ▼
+                  gerar_modelo_bi_girosus.py (regras do GiroSUS)
+                                     │
+                                     ▼
+                      data/gold/girosus/*.parquet
+                                     │
+                                     ▼
+                       Power BI (painel GiroSUS)
 ```
 
 <details>
@@ -104,6 +238,8 @@ IBGE (.xls/.xlsx) ───────────▶  data/raw/ibge
 | Validação | `pytest` | Confere a qualidade da staging e se ela é igual à silver |
 | Promoção para silver | Manual: copiar os arquivos validados de `data/staging` para `data/silver`. Ainda não existe script para isso | `data/silver/*.parquet` |
 | Análises | Notebooks `05` e `06` | Leem apenas `data/silver` |
+| Tabelas do Power BI | `python gerar_modelo_bi_girosus.py` | `data/gold/girosus/*.parquet` (e `.csv` das tabelas pequenas) |
+| Painel | Power BI, seguindo o guia do analista do PDF | Relatório GiroSUS |
 </details>
 
 <details>
@@ -176,7 +312,8 @@ As regras de negócio acima não ficam no pipeline. O `src/` apenas extrai e pad
 
 * Exclusão das AIHs de longa permanência (IDENT igual a 5) e corte do período pela data de internação: notebooks `05` e `06`.
 * Recorte de pacientes residentes em Goiás: notebooks `05` e `06`, cruzando o município de residência (MUNIC_RES) com os códigos de município da base de população.
-* Classificação de doença respiratória (CID J): notebook `06`.
+* Classificação de doença respiratória (CID J): hoje é o grupo “Respiratório” do GiroSUS (capítulo J da CID-10). A análise respiratória antiga do notebook `06` continua no histórico do Git.
+* Regras do GiroSUS (safra por competência, grupo de doença, tempo típico, dias acima do típico): notebook `06` e `gerar_modelo_bi_girosus.py`, com a mesma lógica nos dois.
 
 Quem for criar um indicador novo deve reaplicar os mesmos filtros para os números baterem com as análises existentes.
 </details>
@@ -184,7 +321,9 @@ Quem for criar um indicador novo deve reaplicar os mesmos filtros para os númer
 <details>
 <summary>📈 O que as análises já responderam</summary>
 
-Internações respiratórias representam cerca de 9% do total de internações em Goiás, com pico entre abril e junho. Municípios menores têm taxa de internação por habitante mais alta que municípios grandes, mesmo tendo menos casos em número absoluto. Comparadas às demais internações, elas têm mortalidade mais que o dobro, tempo de internação maior e uso de UTI quase duas vezes mais frequente.
+No produto GiroSUS (safra 2025, todas as causas, em leito-dia): 1,84 milhão de leitos-dia e R$ 726 milhões pagos; o respiratório é a 2ª causa que mais ocupa leito; internações de mais de 15 dias são 4,4% dos pacientes e 27,3% dos leitos; 43,9% dos leitos-dia ficam acima do tempo típico; Goiânia concentra 44,7% dos leitos-dia do estado. Detalhes na seção [O produto GiroSUS](#o-produto-girosus).
+
+Na análise respiratória anterior: internações respiratórias representam cerca de 9% do total de internações em Goiás, com pico entre abril e junho. Municípios menores têm taxa de internação por habitante mais alta que municípios grandes, mesmo tendo menos casos em número absoluto. Comparadas às demais internações, elas têm mortalidade mais que o dobro, tempo de internação maior e uso de UTI quase duas vezes mais frequente.
 </details>
 
 ## Como funcionam os notebooks
@@ -197,7 +336,7 @@ Os notebooks seguem uma ordem numerada, e cada um tem uma responsabilidade espec
 * `01`, `02`, `03`: exploração de cada fonte isolada (SIH, CNES, IBGE), entendendo dimensão, tipos, nulos e duplicidades.
 * `04`: consolidação das bases em um único dataset multianual por fonte. Foi a primeira versão da consolidação que hoje o pipeline faz (veja [O notebook 04 e a pasta data/silver](#fluxo-dos-dados)).
 * `05`: análise integrada, cruzando as três fontes para responder a pergunta de negócio principal.
-* `06`: recorte temático, aprofundando em um assunto específico (doenças respiratórias).
+* `06`: análise do produto GiroSUS. Calcula, na safra 2025, todos os números do material comercial e responde as 34 perguntas do painel em três níveis (o retrato, onde e quem, onde agir), além das curiosidades sobre como o SUS paga uma internação. Até a versão anterior, era o recorte de doenças respiratórias; esse conteúdo continua no histórico do Git.
 </details>
 
 <details>
@@ -398,7 +537,7 @@ Python 3.12, com pandas para manipulação de dados, pyarrow para ler e escrever
 <details>
 <summary>🗂️ Existe um dicionário de dados</summary>
 
-Ainda não. Esse é um ponto pendente do projeto: falta uma tabela reunindo nome da coluna, tipo, significado e fonte de cada variável usada.
+Para as tabelas do Power BI, sim: está na seção [Modelo do Power BI (GiroSUS)](#modelo-do-power-bi-girosus) e, completo, no guia do analista do PDF. Para as bases de `data/silver`, ainda não: falta uma tabela reunindo nome da coluna, tipo, significado e fonte de cada variável.
 </details>
 
 <details>
@@ -410,7 +549,7 @@ Em parte. A partir de `data/raw`, a extração e a transformação são scriptad
 <details>
 <summary>🚧 O que ainda não existe neste projeto</summary>
 
-A idade e o sexo do paciente ainda não são extraídos do SIH, então hoje não é possível segmentar a análise respiratória por faixa etária, por exemplo crianças ou idosos.
+A idade e o sexo do paciente ainda não estão na base silver, então hoje não é possível segmentar as análises por faixa etária, por exemplo crianças ou idosos. O mesmo vale para o valor da UTI (`VAL_UTI`), que o `gerar_modelo_bi_girosus.py` lê direto dos arquivos brutos.
 </details>
 
 ## Referências e benchmarks
@@ -478,9 +617,10 @@ A idade e o sexo do paciente ainda não são extraídos do SIH, então hoje não
 
 ## O que ainda falta
 
-* 📊 Modelagem dos dados para Power BI (modelo estrela, medidas em DAX).
-* 🖥️ Construção do dashboard (pasta `dashboard/` ainda vazia).
-* 📖 Dicionário de dados com nome, tipo, significado e fonte de cada coluna usada.
+* 🖥️ Construir o relatório `.pbix` do GiroSUS no Power BI, seguindo o guia do analista do PDF.
+* 🏷️ Preencher os nomes dos hospitais (`dim_hospital.csv`) e dos procedimentos (`dim_procedimento.csv`).
+* 📏 Trocar o tempo típico (mediana do SIH) pela permanência média oficial da tabela SIGTAP.
+* 📖 Dicionário de dados das bases de `data/silver` (o das tabelas do Power BI já existe).
 * 🔄 Script para baixar os `.dbc` do DATASUS e converter para `.parquet`.
 * 📓 Adaptar os notebooks `01`, `02` e `04` para lerem os `.parquet` de `data/raw`, sem depender dos `.dbc`.
 * ⚙️ Etapa automática que copie a staging validada para `data/silver`.
