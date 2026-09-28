@@ -1,6 +1,8 @@
 # GiroSus - /leitos-sus
 
-Projeto de análise da demanda hospitalar em Goiás com dados públicos do SUS (SIH e CNES) e do IBGE. A ideia é entender onde e como as internações apertam a rede de saúde.
+Projeto de análise da demanda hospitalar em Goiás com dados públicos do SUS. A ideia é entender onde e como as internações apertam a rede de saúde.
+
+> **Base do produto: só o SIH/SUS.** O GiroSUS é construído inteiro com as internações do SIH (Sistema de Informações Hospitalares). O projeto também guarda o CNES (leitos) e o IBGE (população), usados na fase de exploração e no notebook `05`, mas eles **não entram** nos números do painel. Do IBGE, o GiroSUS usa apenas os nomes dos municípios. Veja [Por que só o SIH](#o-produto-girosus).
 
 O produto final é o **GiroSUS**: um painel no Power BI que mostra **quem ocupa os leitos do SUS em Goiás, por quanto tempo e quanto isso custa**. Ele olha todas as causas de internação e mede tudo em **leito-dia** (um paciente ocupando um leito por um dia).
 
@@ -40,9 +42,23 @@ O painel serve para **planejar**, não para achar vaga agora: o dado do SUS cheg
 </details>
 
 <details>
+<summary>🏥 Por que só o SIH</summary>
+
+O SIH é a única base que tem, numa linha só, **tudo o que o produto mede**: datas de entrada e saída, dias internado, diagnóstico, procedimento, hospital, cidade do paciente e valor pago pelo SUS. Com ele se calcula leito-dia, tempo típico, custo e fluxo entre cidades sem cruzar com outra fonte.
+
+| Base | Papel no projeto | Entra no GiroSUS? |
+|---|---|---|
+| **SIH/SUS** (internações) | Base do produto | ✅ Sim, todos os números |
+| **IBGE** (população) | Tabela de apoio | Só os nomes dos municípios |
+| **CNES** (leitos) | Exploração (notebooks `02` e `05`) | ❌ Não |
+
+Por que o CNES ficou de fora: ele diz quantos leitos estão **cadastrados**, não quem os ocupa. Leito cadastrado não é leito em operação, e cruzar as duas bases exigiria premissas que o painel não precisa para responder as suas perguntas.
+</details>
+
+<details>
 <summary>📦 Base, safra e números principais</summary>
 
-* **Base:** só o SIH/SUS (`data/silver/sih_multianual.parquet`). A base de população do IBGE entra apenas para dar nome aos municípios.
+* **Base:** só o SIH/SUS (`data/silver/sih_multianual.parquet`).
 * **Safra:** competências de janeiro a dezembro de 2025, só AIH regular (IDENT = 1). O histórico de 2021 a junho de 2026 fica no modelo para ver tendência.
 * **Números de 2025:** 457.403 internações, 1.835.227 leitos-dia, R$ 726,1 milhões pagos, permanência média de 4,0 dias e R$ 396 por leito-dia.
 </details>
@@ -79,7 +95,7 @@ Antes do GiroSUS, o projeto fez uma análise só de doenças respiratórias (con
 leitos-sus/
 ├── 📊 dashboard/                  # Material do produto GiroSUS (PDF)
 ├── 🗂️ data/
-│   ├── raw/                        # Dados originais: SIH e CNES em Parquet, IBGE em planilhas
+│   ├── raw/                        # Dados originais: SIH (base do produto); CNES e IBGE (exploração e apoio)
 │   ├── staging/                    # O que o pipeline gera (fica só na sua máquina, não vai para o Git)
 │   ├── silver/                     # Bases conferidas pelos testes; é daqui que as análises leem
 │   └── gold/girosus/               # Tabelas do Power BI em CSV (geradas na sua máquina, fora do Git)
@@ -199,6 +215,8 @@ IBGE (.xls/.xlsx) ───────────▶  data/raw/ibge
 <details>
 <summary>⚙️ O que o pipeline faz com cada fonte</summary>
 
+O pipeline trata as três bases, porque elas alimentam as análises exploratórias. O GiroSUS, porém, lê só a silver do SIH (e os nomes de municípios do IBGE).
+
 Cada fonte (SIH, CNES, IBGE) passa por três passos, cada um na sua pasta dentro de `src/`:
 
 1. **`extract/`**: lê os arquivos de `data/raw` e carrega numa tabela (DataFrame), sem mudar nada. No SIH e no CNES, lê os `.parquet` mensais dos anos definidos em `src/config.py` e anota o nome do arquivo de origem. No IBGE, lê as planilhas de população de cada ano.
@@ -254,7 +272,7 @@ As bases não terminam no mesmo mês: o SIH vai até junho de 2026 e o CNES até
 <details>
 <summary>📍 Recorte geográfico</summary>
 
-O foco é Goiás (UF GO, código IBGE 52). Nos indicadores por população (por exemplo, internações por 10 mil habitantes), entram só pacientes que moram em municípios goianos.
+O foco é Goiás (UF GO, código IBGE 52): internações em hospitais goianos. No notebook `05`, que calcula indicadores por população (internações por 10 mil habitantes), entram só pacientes que moram em municípios goianos.
 </details>
 
 <details>
@@ -264,7 +282,7 @@ O GiroSUS agrupa as internações pela primeira letra do diagnóstico principal 
 </details>
 
 <details>
-<summary>🗓️ Por que a população vem de várias publicações do IBGE</summary>
+<summary>🗓️ Por que a população vem de várias publicações do IBGE (base de apoio)</summary>
 
 Não existe uma única fonte do IBGE com todos os anos, então o projeto junta várias:
 
@@ -354,7 +372,7 @@ Os arquivos do DATASUS vêm com nomes curtos e códigos que não dizem nada sozi
 
 Use sempre que for criar um indicador, montar um gráfico ou explicar um número numa apresentação.
 
-Ele cobre 93 colunas: SIH (23), CNES (12), IBGE (10) e as tabelas do painel (48), além do significado de cada código.
+Ele cobre 93 colunas: SIH (23, a base do produto), as tabelas do painel (48), e também CNES (12) e IBGE (10), que existem no projeto como bases de exploração e apoio.
 </details>
 
 <details>
@@ -369,7 +387,7 @@ Ele cobre 93 colunas: SIH (23), CNES (12), IBGE (10) e as tabelas do painel (48)
 </details>
 
 <details>
-<summary>🏥 SIH, internações (silver)</summary>
+<summary>🏥 SIH, internações (silver) · base do produto</summary>
 
 Arquivo: `data/silver/sih_multianual.parquet` · 1 linha = 1 AIH (inclui as de continuação) · 2.286.755 registros, competências de jan/2021 a jun/2026, hospitais de Goiás.
 
@@ -401,7 +419,7 @@ Arquivo: `data/silver/sih_multianual.parquet` · 1 linha = 1 AIH (inclui as de c
 </details>
 
 <details>
-<summary>🛏️ CNES, leitos (silver)</summary>
+<summary>🛏️ CNES, leitos (silver) · exploração, fora do GiroSUS</summary>
 
 Arquivo: `data/silver/cnes_multianual.parquet` · 1 linha = 1 tipo de leito de 1 estabelecimento em 1 mês · 198.448 registros, jan/2021 a jul/2026.
 
@@ -422,7 +440,7 @@ Arquivo: `data/silver/cnes_multianual.parquet` · 1 linha = 1 tipo de leito de 1
 </details>
 
 <details>
-<summary>👥 IBGE, população (silver)</summary>
+<summary>👥 IBGE, população (silver) · apoio: no GiroSUS, só nomes de municípios</summary>
 
 Arquivo: `data/silver/populacao_multianual.parquet` · 1 linha = 1 município em 1 ano · 33.422 registros, todos os municípios do Brasil, 2021 a 2026.
 
@@ -557,7 +575,7 @@ Eles seguem uma ordem numerada, e cada um tem um papel:
 
 * **`01`, `02`, `03`:** exploração de cada fonte sozinha (SIH, CNES, IBGE): tamanho, tipos, valores vazios e duplicados.
 * **`04`:** primeira versão da consolidação multianual, que hoje o pipeline faz.
-* **`05`:** análise integrada, cruzando as três fontes para responder a pergunta de negócio principal.
+* **`05`:** análise integrada, cruzando as três fontes (é anterior ao GiroSUS e não alimenta o painel).
 * **`06_girosus_ocupacao_leitos`:** análise do GiroSUS. Calcula, na safra 2025, todos os números do material do produto e responde as 34 perguntas do painel em três níveis (o retrato, onde e quem, onde agir), além das curiosidades sobre como o SUS paga uma internação.
 
 Os notebooks de análise (`05` e `06`) leem sempre `data/silver`, nunca os dados brutos. Assim todo mundo analisa a mesma versão conferida.
@@ -804,7 +822,7 @@ Sim, com uma etapa manual: baixar os `.dbc` no site do DATASUS. Daí em diante s
 ## Bases de dados e fontes
 
 <details>
-<summary>🏥 SIH/SUS, Internações Hospitalares (AIH)</summary>
+<summary>🏥 SIH/SUS, Internações Hospitalares (AIH) · base do produto</summary>
 
 **O que é:** a base de internações do SUS, com procedimentos, diagnósticos, datas de entrada e saída, município do paciente e do hospital e valores pagos.
 
@@ -814,9 +832,9 @@ Sim, com uma etapa manual: baixar os `.dbc` no site do DATASUS. Daí em diante s
 </details>
 
 <details>
-<summary>🛏️ CNES, Estabelecimentos e Leitos</summary>
+<summary>🛏️ CNES, Estabelecimentos e Leitos · exploração, fora do GiroSUS</summary>
 
-**O que é:** o Cadastro Nacional de Estabelecimentos de Saúde, usado para saber os tipos de leito e a capacidade instalada de cada estabelecimento.
+**O que é:** o Cadastro Nacional de Estabelecimentos de Saúde: tipos de leito e capacidade instalada de cada estabelecimento. No projeto, foi usado na exploração (notebooks `02` e `05`); não entra no GiroSUS.
 
 **Arquivos usados:** Leitos (LT).
 
@@ -824,9 +842,9 @@ Sim, com uma etapa manual: baixar os `.dbc` no site do DATASUS. Daí em diante s
 </details>
 
 <details>
-<summary>👥 IBGE, População Municipal</summary>
+<summary>👥 IBGE, População Municipal · apoio</summary>
 
-**Para que serve no projeto:** dar nome aos municípios e calcular indicadores por habitante, como internações por 10 mil habitantes.
+**Para que serve no projeto:** no GiroSUS, só dar nome aos municípios. No notebook `05`, calcular indicadores por habitante, como internações por 10 mil habitantes.
 
 * **Estimativas da População:** estimativas anuais por município. [Acessar](https://ftp.ibge.gov.br/Estimativas_de_Populacao/)
 * **Censo Demográfico 2022, População e Domicílios:** [Acessar](https://ftp.ibge.gov.br/Censos/Censo_Demografico_2022/Populacao_e_domicilios_Primeiros_resultados/)
@@ -856,7 +874,7 @@ O que já existe e o que falta. Legenda: ✅ pronto · ❌ falta.
 <details>
 <summary>🗂️ Dados</summary>
 
-* ✅ **Dados brutos** (`data/raw/`): SIH de jan/2021 a jun/2026, CNES de jan/2021 a jul/2026 (Parquet, convertidos do `.dbc` por `src/converter_dbc.py`) e planilhas do IBGE.
+* ✅ **Dados brutos** (`data/raw/`): SIH de jan/2021 a jun/2026 (base do produto); CNES de jan/2021 a jul/2026 e planilhas do IBGE (exploração e apoio). SIH e CNES em Parquet, convertidos do `.dbc` por `src/converter_dbc.py`.
 * ✅ **Staging** (`data/staging/`): gerada pelo pipeline, só na sua máquina.
 * ✅ **Silver** (`data/silver/`): SIH, CNES e população, conferidas e promovidas por `src/promover_silver.py`.
 * ✅ **Tabelas do painel** (`data/gold/girosus/`): 8 tabelas em CSV, geradas pelo script, só na sua máquina.
