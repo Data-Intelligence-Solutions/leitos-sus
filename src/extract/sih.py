@@ -56,32 +56,3 @@ def extrair_sih() -> pd.DataFrame:
         partes.append(df)
 
     return pd.concat(partes, ignore_index=True)
-
-
-# Colunas críticas sem valores nulos
-
-def test_colunas_criticas_sih_sem_nulos(df_sih):
-    colunas_criticas = [
-        "ANO_CMPT",
-        "MES_CMPT",
-        "N_AIH",
-        "CNES",
-        "MUNIC_RES",
-        "MUNIC_MOV",
-        "DT_INTER",
-        "DT_SAIDA",
-        "ARQUIVO_ORIGEM",
-    ]
-
-    nulos = df_sih[colunas_criticas].isna().sum().sum()
-
-    assert nulos == 0
-
-
-# Datas válidas do SIH
-
-def test_datas_sih_validas(df_sih):
-    datas_saida = pd.to_datetime(df_sih["DT_SAIDA"], format="%Y%m%d", errors="coerce")
-
-    assert df_sih["DT_INTER"].notna().all()
-    assert datas_saida.notna().all()

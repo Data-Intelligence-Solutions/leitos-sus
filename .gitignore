@@ -1,13 +1,13 @@
-
 # Arquivos grandes locais
 *.dbc
+*.dbf
 data/raw/ibge/censo_2022/Pessoas_52_publico.csv
-
-# Documentação de referência local
-docs/
 
 # Dados temporários do pipeline
 data/staging/
+
+# Tabelas do painel GiroSUS (geradas pelo script, grandes demais para o Git)
+data/gold/girosus/
 
 # Cache do Python
 __pycache__/
@@ -16,11 +16,5 @@ __pycache__/
 # Cache de testes
 .pytest_cache/
 
-# Dados temporários do pipeline
-data/staging/
-
 # Ambiente virtual
 .venv/
-
-# Tabelas do painel GiroSUS (geradas pelo script, grandes demais para o Git)
-data/gold/girosus/
