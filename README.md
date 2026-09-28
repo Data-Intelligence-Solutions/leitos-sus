@@ -38,6 +38,16 @@ source .venv/Scripts/activate
 pip install -r requirements.txt
 ```
 
+### Gerar as tabelas (CSV e Parquet) do painel GiroSUS no Power BI
+
+Com o ambiente ativo, na raiz do projeto:
+
+```bash
+python gerar_modelo_bi_girosus.py
+```
+
+Esse comando cria a pasta `data/gold/girosus/` com os 8 arquivos que o Power BI importa (`.parquet`, e `.csv` das tabelas pequenas). Leva cerca de 1 minuto e, no final, imprime os totais da safra 2025 para conferência: 457.403 internações, 1.835.227 leitos-dia, R$ 726,1 milhões e 43,9% acima do tempo típico. Rode de novo sempre que a base `data/silver` for atualizada. Detalhes em [Modelo do Power BI (GiroSUS)](#modelo-do-power-bi-girosus).
+
 Para rodar os notebooks no VS Code, abra a pasta do projeto: o arquivo `.vscode/settings.json` já seleciona o Python do `.venv` e o `ipykernel` vem no `requirements.txt`, então não é preciso instalar nem escolher kernel manualmente.
 
 ```bash
@@ -184,6 +194,7 @@ leitos-sus/
 │   ├── staging/           # Saída do pipeline (gerada localmente, não vai para o Git)
 │   ├── silver/            # Bases consolidadas e validadas, usadas nas análises
 │   └── gold/girosus/      # Tabelas prontas para o Power BI (geradas por gerar_modelo_bi_girosus.py)
+├── 📖 dicionario_dados/  # Dicionário de dados: o que é cada coluna (README.md para ler, .csv para filtrar)
 ├── 🧭 modelagem_bi/      # Documentos de apoio da modelagem (versões anteriores e estudos de produto)
 ├── 📓 notebooks/         # Jupyter notebooks de exploração e análise (06 = análise do GiroSUS)
 ├── 🐍 src/
@@ -537,7 +548,7 @@ Python 3.12, com pandas para manipulação de dados, pyarrow para ler e escrever
 <details>
 <summary>🗂️ Existe um dicionário de dados</summary>
 
-Para as tabelas do Power BI, sim: está na seção [Modelo do Power BI (GiroSUS)](#modelo-do-power-bi-girosus) e, completo, no guia do analista do PDF. Para as bases de `data/silver`, ainda não: falta uma tabela reunindo nome da coluna, tipo, significado e fonte de cada variável.
+Sim, em [`dicionario_dados/`](dicionario_dados/README.md). Ele descreve todas as colunas das bases de `data/silver` (SIH, CNES e população) e das tabelas do painel GiroSUS em `data/gold/girosus`: tipo, significado, origem e exemplo, além do que significa cada código (IDENT, MORTE, CAR_INT, ESPEC, SEXO, tipos de leito etc.). A mesma informação está em `dicionario_dados.csv`, para abrir no Excel.
 </details>
 
 <details>
@@ -620,7 +631,6 @@ A idade e o sexo do paciente ainda não estão na base silver, então hoje não 
 * 🖥️ Construir o relatório `.pbix` do GiroSUS no Power BI, seguindo o guia do analista do PDF.
 * 🏷️ Preencher os nomes dos hospitais (`dim_hospital.csv`) e dos procedimentos (`dim_procedimento.csv`).
 * 📏 Trocar o tempo típico (mediana do SIH) pela permanência média oficial da tabela SIGTAP.
-* 📖 Dicionário de dados das bases de `data/silver` (o das tabelas do Power BI já existe).
 * 🔄 Script para baixar os `.dbc` do DATASUS e converter para `.parquet`.
 * 📓 Adaptar os notebooks `01`, `02` e `04` para lerem os `.parquet` de `data/raw`, sem depender dos `.dbc`.
 * ⚙️ Etapa automática que copie a staging validada para `data/silver`.
