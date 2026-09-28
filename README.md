@@ -575,7 +575,7 @@ Os notebooks de análise (`05` e `06`) leem sempre `data/silver`, nunca os dados
 <details>
 <summary>✅ O que os testes conferem</summary>
 
-Os testes ficam em `tests/` e rodam com `pytest`. São 15 no total (12 de qualidade da staging e 3 que comparam staging e silver), e eles conferem:
+Os testes ficam em `tests/` e rodam com `python -m pytest`. São 15 no total (12 de qualidade da staging e 3 que comparam staging e silver), e eles conferem:
 
 * Colunas importantes sem valores vazios (data de internação, código do município, CNES).
 * Nada duplicado nas chaves (por exemplo, município + ano na população).
@@ -591,11 +591,34 @@ Os testes leem `data/staging`, que não vem no repositório. Então, num clone n
 
 ```bash
 python -m src.pipeline
-pytest
+python -m pytest
 ```
 
+* Use `python -m pytest`, não só `pytest`. Os testes importam `from src...`, e só o `python -m` coloca a raiz do projeto no caminho do Python. Sem ele, aparece `No module named 'src'`.
 * O pipeline mostra na tela cada base gravada (linhas, colunas e tempo). Se não aparecer nada, veja [O comando não mostra nada na tela](#solução-de-problemas).
 * Se só os testes de `test_staging_silver.py` falharem, a staging é mais nova que a silver. Rode `python -m src.promover_silver`, que testa e atualiza a silver.
+</details>
+
+<details>
+<summary>🧪 Como conferir que o projeto inteiro funciona</summary>
+
+Rode na ordem. Cada comando precisa terminar sem nenhuma linha de `ERRO`:
+
+| Comando | O que tem que aparecer |
+|---|---|
+| `python -m src.converter_dbc` | "Nada a converter" (ou um OK por `.dbc` novo) |
+| `python -m src.pipeline` | 3 linhas OK: SIH 2.286.755 linhas e 23 colunas, CNES 198.448 e 12, População 33.422 e 10 |
+| `python -m src.orchestration.prefect_flow` | As mesmas 3 linhas OK, no meio dos logs do Prefect, e o flow terminando como `Completed` |
+| `python -m src.promover_silver` | 12 passed, 3 arquivos copiados, 3 passed e "Silver atualizada" |
+| `python -m pytest` | 15 passed |
+| `python gerar_modelo_bi_girosus.py` | Conferência de 2025 batendo (457.403 · 1.835.227 · 726,1 · 43,9) e 8 linhas OK |
+
+Depois, confira à mão:
+
+* `data/gold/girosus/` tem 8 arquivos, todos `.csv`, nenhum `.parquet`.
+* O `dim_hospital.csv` abre no Excel com as colunas separadas.
+* O notebook `06_girosus_ocupacao_leitos` roda inteiro (Run All) com os mesmos números.
+* O `git status` não mostra nada de `data/gold/girosus/` nem de `data/staging/`.
 </details>
 
 ## Como atualizar os dados
@@ -683,9 +706,21 @@ No Windows, às vezes o `python` abre o atalho da Microsoft Store, que não faz 
 </details>
 
 <details>
+<summary>❌ O pytest dá “No module named 'src'”</summary>
+
+Rode `python -m pytest` em vez de `pytest`, sempre na pasta do projeto. Veja [Como rodar os testes](#testes).
+</details>
+
+<details>
+<summary>⚠️ Aparecem avisos amarelos (DeprecationWarning)</summary>
+
+Vêm das bibliotecas (`dateutil`, NumPy), não do código do projeto, e não mudam nenhum número. Pode seguir. Só é problema se aparecer `ERRO` ou `FAILED`.
+</details>
+
+<details>
 <summary>❌ Os testes falham com “arquivo não encontrado”</summary>
 
-Os testes leem `data/staging`, que só existe depois de rodar o pipeline. Rode `python -m src.pipeline` antes do `pytest`.
+Os testes leem `data/staging`, que só existe depois de rodar o pipeline. Rode `python -m src.pipeline` antes do `python -m pytest`.
 </details>
 
 <details>
@@ -858,18 +893,10 @@ O que já existe e o que falta. Legenda: ✅ pronto · ❌ falta.
 </details>
 
 <details>
-<summary>📊 Produto (Power BI), com o time de BI</summary>
+<summary>📊 Produto (Power BI)</summary>
 
 * ✅ **Modelo desenhado**: 2 fatos, 6 dimensões, 22 medidas DAX e o parâmetro "Redução %" (no PDF do produto).
 * ❌ **Arquivo `.pbix`** montado.
 * ❌ **Painel publicado**, com link, no Power BI Service.
 * ❌ **Nomes dos hospitais e dos procedimentos** (`dim_hospital.csv` e `dim_procedimento.csv`): hoje o painel mostra só os códigos.
-</details>
-
-<details>
-<summary>🔭 Próximas evoluções</summary>
-
-* ❌ Trocar o tempo típico (mediana do SIH) pela permanência média oficial da tabela SIGTAP.
-* ❌ Levar o valor da UTI (`VAL_UTI`) para a silver; hoje o script do painel lê direto de `data/raw/sih`.
-* ❌ Recortes por faixa etária e sexo no painel (as colunas já estão na silver).
 </details>
