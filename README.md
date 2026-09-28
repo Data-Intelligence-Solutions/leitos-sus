@@ -23,7 +23,7 @@ O produto final é o **GiroSUS**: um painel no Power BI que mostra **quem ocupa 
 * [Perguntas frequentes](#perguntas-frequentes)
 * [Bases de dados e fontes](#bases-de-dados-e-fontes)
 * [Referências e benchmarks](#referências-e-benchmarks)
-* [O que ainda falta](#o-que-ainda-falta)
+* [Status do projeto](#status-do-projeto)
 
 ## O produto GiroSUS
 
@@ -66,8 +66,8 @@ Antes do GiroSUS, o projeto fez uma análise só de doenças respiratórias (con
 | Material | Onde está | Para quem |
 |---|---|---|
 | Material do produto: pitch, 7 páginas do painel com gráficos, 34 perguntas, perguntas de cliente e banca, guia do analista e método | `dashboard/GiroSUS_painel_ocupacao_leitos.pdf` | Clientes, analistas e avaliadores |
-| Análise com todos os números do GiroSUS | `notebooks/06_analise_respiratoria.ipynb` | Analistas |
-| Tabelas que o Power BI importa | geradas por `gerar_modelo_bi_girosus.py` em `data/gold/girosus/` | Analista de BI |
+| Análise com todos os números do GiroSUS | `notebooks/06_girosus_ocupacao_leitos.ipynb` | Analistas |
+| Tabelas que o Power BI importa (8 arquivos `.csv`) | geradas por `gerar_modelo_bi_girosus.py` em `data/gold/girosus/` | Analista de BI |
 | O que significa cada coluna | seção [Dicionário de dados](#dicionário-de-dados) e `docs/dicionário/dicionario_dados.csv` | Todo mundo |
 | Como o código funciona, pasta por pasta | `docs/code/como_funciona.pdf` | Quem vai mexer no código |
 </details>
@@ -82,14 +82,16 @@ leitos-sus/
 │   ├── raw/                        # Dados originais: SIH e CNES em Parquet, IBGE em planilhas
 │   ├── staging/                    # O que o pipeline gera (fica só na sua máquina, não vai para o Git)
 │   ├── silver/                     # Bases conferidas pelos testes; é daqui que as análises leem
-│   └── gold/girosus/               # Tabelas prontas para o Power BI
+│   └── gold/girosus/               # Tabelas do Power BI em CSV (geradas na sua máquina, fora do Git)
 ├── 📖 docs/
 │   ├── dicionário/                 # dicionario_dados.csv: o dicionário em planilha
 │   └── code/                       # como_funciona.pdf: explicação do código
-├── 📓 notebooks/                   # Exploração e análises (06 = GiroSUS)
+├── 📓 notebooks/                   # Exploração e análises (06_girosus_ocupacao_leitos = GiroSUS)
 ├── 🐍 src/
 │   ├── config.py                   # Caminhos e parâmetros (anos, estado) num lugar só
+│   ├── converter_dbc.py            # Converte os .dbc do DATASUS em .parquet (data/raw)
 │   ├── pipeline.py                 # Roda o ETL: extrai, padroniza e grava na staging
+│   ├── promover_silver.py          # Testa a staging e, se passar, copia para a silver
 │   ├── extract/                    # Lê os arquivos de cada fonte (SIH, CNES, IBGE)
 │   ├── transform/                  # Padroniza os dados de cada fonte
 │   └── orchestration/              # O mesmo pipeline, organizado com Prefect
@@ -130,9 +132,11 @@ Com o ambiente ativo:
 python gerar_modelo_bi_girosus.py
 ```
 
-O que acontece: o script lê `data/silver`, aplica as regras do GiroSUS e grava as 8 tabelas do Power BI em `data/gold/girosus/` (em `.parquet`, e as pequenas também em `.csv`). Leva cerca de 1 minuto.
+O que acontece: o script lê `data/silver`, aplica as regras do GiroSUS e grava as **8 tabelas do Power BI em `.csv`** em `data/gold/girosus/`. Leva cerca de 1 minuto e meio. Se houver `.parquet` antigos nessa pasta, o script apaga, para ninguém se confundir.
 
-No final, ele imprime a conferência da safra 2025. Esses números precisam bater com o PDF e com o notebook 06: **457.403 internações, 1.835.227 leitos-dia, R$ 726,1 milhões e 43,9% dos leitos-dia acima do típico**.
+Os CSVs usam o padrão brasileiro: separador `;` e decimal `,` (por exemplo, `485,78`). O Excel e o Power BI em português abrem direto. Feche esses arquivos no Excel antes de rodar, senão o script não consegue regravar e avisa.
+
+No final, ele confere se os 8 CSVs existem com todas as colunas e imprime a conferência da safra 2025. Esses números precisam bater com o PDF e com o notebook 06: **457.403 internações, 1.835.227 leitos-dia, R$ 726,1 milhões e 43,9% dos leitos-dia acima do típico**.
 
 Rode de novo sempre que `data/silver` for atualizada.
 </details>
@@ -152,7 +156,7 @@ Só é preciso se você mudou algo em `data/raw` ou em `src/`. O passo a passo c
 ## Como os dados andam
 
 ```
-DATASUS (.dbc)  ──conversão──▶  data/raw/sih, data/raw/cnes (.parquet)
+DATASUS (.dbc)  ──src/converter_dbc.py──▶  data/raw/sih, data/raw/cnes (.parquet)
 IBGE (.xls/.xlsx) ───────────▶  data/raw/ibge
                                      │
                                      ▼
@@ -160,9 +164,9 @@ IBGE (.xls/.xlsx) ───────────▶  data/raw/ibge
                                      │
                                      ▼
                          data/staging/*.parquet
-                                     │  pytest confere
+                                     │  src/promover_silver.py (testa e copia)
                                      ▼
-                         data/silver/*.parquet  (cópia conferida, feita à mão)
+                         data/silver/*.parquet
                                      │
                                      ▼
                       notebooks 05 e 06 (análises)
@@ -171,7 +175,7 @@ IBGE (.xls/.xlsx) ───────────▶  data/raw/ibge
                   gerar_modelo_bi_girosus.py (regras do GiroSUS)
                                      │
                                      ▼
-                      data/gold/girosus/*.parquet
+                      data/gold/girosus/*.csv
                                      │
                                      ▼
                        Power BI (painel GiroSUS)
@@ -183,13 +187,12 @@ IBGE (.xls/.xlsx) ───────────▶  data/raw/ibge
 | Etapa | Onde acontece | Resultado |
 |---|---|---|
 | Baixar os arquivos mensais do SIH (RD) e do CNES (LT) | À mão, no site do DATASUS | Arquivos `.dbc` |
-| Converter `.dbc` para `.parquet` | Fora do pipeline, com o PySUS. O script dessa conversão ainda não está no repositório | `data/raw/sih/<ano>/RDGO*.parquet` e `data/raw/cnes/<ano>/LTGO*.parquet` |
+| Converter `.dbc` para `.parquet` | `python -m src.converter_dbc` (usa o PySUS; só converte o que ainda não tem `.parquet`) | `data/raw/sih/<ano>/RDGO*.parquet` e `data/raw/cnes/<ano>/LTGO*.parquet` |
 | Baixar as planilhas de população | À mão, no FTP do IBGE | `data/raw/ibge/...` |
-| Extrair e padronizar | `src/pipeline.py` ou o flow do Prefect | `data/staging/*.parquet` |
-| Conferir | `pytest` | Qualidade da staging e se ela é igual à silver |
-| Promover para silver | À mão: copiar os arquivos conferidos de `data/staging` para `data/silver` (ainda não tem script) | `data/silver/*.parquet` |
+| Extrair e padronizar | `python -m src.pipeline` ou o flow do Prefect (mostra na tela cada base gravada) | `data/staging/*.parquet` |
+| Conferir e promover para silver | `python -m src.promover_silver`: roda os testes de qualidade e, só se passarem, copia a staging para a silver e confere se ficaram iguais | `data/silver/*.parquet` |
 | Analisar | Notebooks `05` e `06` | Leem só `data/silver` |
-| Montar as tabelas do painel | `python gerar_modelo_bi_girosus.py` | `data/gold/girosus/` |
+| Montar as tabelas do painel | `python gerar_modelo_bi_girosus.py` | `data/gold/girosus/*.csv` |
 | Painel | Power BI, seguindo o guia do analista do PDF | Relatório GiroSUS |
 </details>
 
@@ -203,15 +206,15 @@ Cada fonte (SIH, CNES, IBGE) passa por três passos, cada um na sua pasta dentro
    * **SIH** (`transform/sih.py`): transforma a data de internação (DT_INTER) em data. O resto fica como veio.
    * **CNES** (`transform/cnes.py`): tira o ano e o mês do nome do arquivo (`LTGO2401` vira 2024, mês 1) e transforma as quantidades de leitos (QT_EXIST, QT_SUS, QT_NSUS) em número.
    * **População** (`transform/populacao.py`): padroniza os nomes das colunas de cada planilha, monta o código de município com 7 dígitos, limpa os valores (tira pontos e notas de rodapé), marca a origem de cada ano e calcula 2023 pela média entre 2022 e 2024.
-3. **Grava** o resultado em Parquet em `data/staging`.
+3. **Grava** o resultado em Parquet em `data/staging` e mostra na tela quantas linhas e colunas cada base teve.
 
-O pipeline **não** grava em `data/silver`. A silver só recebe a staging depois que os testes passam.
+O pipeline **não** grava em `data/silver`. Quem faz isso é o `src/promover_silver.py`, e só depois que os testes passam.
 </details>
 
 <details>
-<summary>📦 Por que Parquet e não CSV</summary>
+<summary>📦 Parquet por dentro, CSV na entrega</summary>
 
-Parquet é um formato compacto e rápido de ler, e guarda o tipo de cada coluna junto com o arquivo. Assim ninguém precisa reconverter datas e números toda vez que abre os dados. O CSV só aparece nas tabelas pequenas do painel, para facilitar abrir no Excel.
+Nas camadas internas (raw, staging e silver), o projeto usa Parquet: é compacto, rápido de ler e guarda o tipo de cada coluna, então ninguém precisa reconverter datas e números. Só a saída do painel (`data/gold/girosus/`) é em CSV, porque é o formato que o time de BI usa no Power BI e no Excel.
 </details>
 
 <details>
@@ -221,9 +224,12 @@ Estes itens estão no `.gitignore` e não aparecem num `git clone`:
 
 * `*.dbc`: arquivos originais do DATASUS. O repositório já traz a versão em `.parquet`, que é a que o pipeline usa.
 * `data/raw/ibge/censo_2022/Pessoas_52_publico.csv`: microdados do Censo, grandes demais e fora da base final.
+* `*.dbf`: arquivo temporário que o PySUS cria durante a conversão.
 * `data/staging/`: aparece quando você roda o pipeline.
-* `docs/`: documentação local (dicionário em CSV e PDF do código).
+* `data/gold/girosus/`: as tabelas do painel. O CSV da fato passa de 250 MB, acima do limite do GitHub (100 MB); cada pessoa gera o seu com o script.
 * `.venv/`: o ambiente virtual de cada pessoa.
+
+A pasta `docs/` (dicionário em CSV e PDF do código) **vai** para o Git.
 </details>
 
 ## Regras de negócio
@@ -300,10 +306,10 @@ O script `gerar_modelo_bi_girosus.py` (veja [Como rodar o projeto](#como-rodar-o
 | `dim_hospital` | Um hospital (CNES) | 303 |
 | `dim_municipio_residencia` e `dim_municipio_atendimento` | Um município (mesma tabela, uma para cada lado da relação) | 2.362 |
 
-* Todas saem em `.parquet`. `dim_diagnostico`, `dim_procedimento`, `dim_hospital` e `dim_municipio_residencia` também saem em `.csv`.
+* Todas saem em `.csv` (separador `;`, decimal `,`). No Power BI: Obter dados > Texto/CSV, uma tabela por arquivo.
+* Na importação, deixe `cnes`, `proc_rea`, `cid`, `codigo`, `munic_residencia` e `munic_atendimento` como **Texto**. Senão o Power BI tira o zero da frente (`0965324` vira `965324`).
 * Em `dim_hospital.csv` e `dim_procedimento.csv`, as colunas `nome_hospital` e `nome_procedimento` vêm em branco, para preencher à mão pela consulta pública do CNES e pela tabela SIGTAP.
 * O valor da UTI (`VAL_UTI`) ainda não está na silver, então o script lê direto de `data/raw/sih`. Se esses arquivos não estiverem na máquina, só a coluna `valor_uti` fica vazia.
-* A `fato_internacoes.parquet` passa de 40 MB. Combinem no grupo se ela vai para o Git ou se cada pessoa gera a sua.
 
 O que é cada coluna: [Dicionário de dados › Tabelas do painel GiroSUS](#dicionário-de-dados).
 </details>
@@ -358,7 +364,7 @@ Ele cobre 93 colunas: SIH (23), CNES (12), IBGE (10) e as tabelas do painel (48)
 * **Origem:** o campo do arquivo original do DATASUS (RD = internações do SIH; LT = leitos do CNES) ou a regra usada para criar a coluna.
 * **Número guardado como texto:** “texto (número)” quer dizer que é número, mas vem como texto. Converta antes de somar (em pandas: `pd.to_numeric(df["VAL_TOT"])`). As tabelas do GiroSUS já vêm convertidas.
 * **A idade depende de outra coluna:** `IDADE = 3` pode ser 3 anos, 3 meses ou 3 dias. Quem diz é `COD_IDADE`.
-* **Colunas que ainda não chegaram na silver:** `SEXO`, `IDADE`, `COD_IDADE` e `GESTAO` já saem do pipeline (estão em `data/staging`), mas só chegam em `data/silver` depois de promover a staging (veja [Como atualizar os dados](#como-atualizar-os-dados)).
+* **`SEXO`, `IDADE`, `COD_IDADE` e `GESTAO`:** saem do pipeline e chegam em `data/silver` quando você roda `python -m src.promover_silver`. Se a sua silver for antiga, rode o pipeline e a promoção (veja [Como atualizar os dados](#como-atualizar-os-dados)).
 * **Mantenha em dia:** criou, renomeou ou removeu uma coluna? Atualize esta seção e o CSV na mesma branch da mudança.
 </details>
 
@@ -387,10 +393,10 @@ Arquivo: `data/silver/sih_multianual.parquet` · 1 linha = 1 AIH (inclui as de c
 | `ESPEC` | texto | Especialidade do leito. Ver códigos | SIH (RD) | `03` |
 | `PROC_REA` | texto | Procedimento realizado, pela tabela SIGTAP (10 dígitos). Define o valor pago | SIH (RD) | `0303140151` |
 | `CAR_INT` | texto | Caráter da internação (eletiva, urgência, acidente). Ver códigos | SIH (RD) | `02` |
-| `SEXO` | texto | Sexo do paciente. Ver códigos | SIH (RD) · entra na silver ao promover a staging | `3` |
-| `IDADE` | texto (número) | Idade, na unidade indicada por COD_IDADE | SIH (RD) · entra na silver ao promover a staging | `27` |
-| `COD_IDADE` | texto | Unidade da idade (dias, meses, anos). Ver códigos | SIH (RD) · entra na silver ao promover a staging | `4` |
-| `GESTAO` | texto | Tipo de gestão do hospital. Ver códigos | SIH (RD) · entra na silver ao promover a staging | `1` |
+| `SEXO` | texto | Sexo do paciente. Ver códigos | SIH (RD) · chega na silver com `src.promover_silver` | `3` |
+| `IDADE` | texto (número) | Idade, na unidade indicada por COD_IDADE | SIH (RD) · chega na silver com `src.promover_silver` | `27` |
+| `COD_IDADE` | texto | Unidade da idade (dias, meses, anos). Ver códigos | SIH (RD) · chega na silver com `src.promover_silver` | `4` |
+| `GESTAO` | texto | Tipo de gestão do hospital. Ver códigos | SIH (RD) · chega na silver com `src.promover_silver` | `1` |
 | `ARQUIVO_ORIGEM` | texto | Arquivo mensal do DATASUS de onde veio a linha (RDGO + AAMM) | Criada em `src/extract/sih.py` | `RDGO2505.dbc` |
 </details>
 
@@ -552,7 +558,7 @@ Eles seguem uma ordem numerada, e cada um tem um papel:
 * **`01`, `02`, `03`:** exploração de cada fonte sozinha (SIH, CNES, IBGE): tamanho, tipos, valores vazios e duplicados.
 * **`04`:** primeira versão da consolidação multianual, que hoje o pipeline faz.
 * **`05`:** análise integrada, cruzando as três fontes para responder a pergunta de negócio principal.
-* **`06`:** análise do GiroSUS. Calcula, na safra 2025, todos os números do material do produto e responde as 34 perguntas do painel em três níveis (o retrato, onde e quem, onde agir), além das curiosidades sobre como o SUS paga uma internação.
+* **`06_girosus_ocupacao_leitos`:** análise do GiroSUS. Calcula, na safra 2025, todos os números do material do produto e responde as 34 perguntas do painel em três níveis (o retrato, onde e quem, onde agir), além das curiosidades sobre como o SUS paga uma internação.
 
 Os notebooks de análise (`05` e `06`) leem sempre `data/silver`, nunca os dados brutos. Assim todo mundo analisa a mesma versão conferida.
 </details>
@@ -560,7 +566,7 @@ Os notebooks de análise (`05` e `06`) leem sempre `data/silver`, nunca os dados
 <details>
 <summary>⚠️ Cuidados: notebooks 01, 02 e 04</summary>
 
-* **Precisam dos `.dbc`:** `01`, `02` e `04` leem os arquivos `.dbc` originais com o PySUS. Como eles não vêm no repositório, esses notebooks param com erro num clone novo. Para rodar, coloque os `.dbc` em `data/raw/sih/<ano>` e `data/raw/cnes/<ano>`. Os notebooks `03`, `05` e `06` rodam normalmente.
+* **Precisam dos `.dbc`:** `01`, `02` e `04` leem os arquivos `.dbc` originais com o PySUS. Como eles não vêm no repositório, esses notebooks param com erro num clone novo. Para rodar, baixe os `.dbc` do DATASUS e coloque em `data/raw/sih/<ano>` e `data/raw/cnes/<ano>`. Os notebooks `03`, `05` e `06` rodam normalmente.
 * **O `04` sobrescreve a silver:** a última célula do `04` grava em `data/silver`, mas salva a data de internação (DT_INTER) como texto, enquanto o pipeline salva como data. Não rode essa célula sem necessidade: ela bagunça a silver e faz o teste `test_sih_staging_igual_silver` falhar.
 </details>
 
@@ -569,7 +575,7 @@ Os notebooks de análise (`05` e `06`) leem sempre `data/silver`, nunca os dados
 <details>
 <summary>✅ O que os testes conferem</summary>
 
-Os testes ficam em `tests/` e rodam com `pytest`. São 15 no total, e eles conferem:
+Os testes ficam em `tests/` e rodam com `pytest`. São 15 no total (12 de qualidade da staging e 3 que comparam staging e silver), e eles conferem:
 
 * Colunas importantes sem valores vazios (data de internação, código do município, CNES).
 * Nada duplicado nas chaves (por exemplo, município + ano na população).
@@ -588,8 +594,8 @@ python -m src.pipeline
 pytest
 ```
 
-* O `python -m src.pipeline` **não mostra nada na tela**, e isso é normal. Para saber se funcionou, veja se os 3 arquivos em `data/staging` foram criados ou atualizados.
-* Se só os testes de `test_staging_silver.py` falharem, é porque a staging nova tem colunas que a silver ainda não tem. Promova a staging (veja [Como atualizar os dados](#como-atualizar-os-dados), passo 5) e rode o `pytest` de novo.
+* O pipeline mostra na tela cada base gravada (linhas, colunas e tempo). Se não aparecer nada, veja [O comando não mostra nada na tela](#solução-de-problemas).
+* Se só os testes de `test_staging_silver.py` falharem, a staging é mais nova que a silver. Rode `python -m src.promover_silver`, que testa e atualiza a silver.
 </details>
 
 ## Como atualizar os dados
@@ -598,17 +604,19 @@ pytest
 <summary>📆 Incluir um mês novo do SIH ou do CNES</summary>
 
 1. Baixe o arquivo do mês no [DATASUS](https://datasus.saude.gov.br/transferencia-de-arquivos/): `RDGOAAMM.dbc` para o SIH e `LTGOAAMM.dbc` para o CNES (AA = ano com dois dígitos, MM = mês).
-2. Converta o `.dbc` para `.parquet`, com o mesmo nome, e salve na pasta do ano: `data/raw/sih/<ano>/` ou `data/raw/cnes/<ano>/`. Todas as colunas como texto, igual aos arquivos que já estão lá.
+2. Coloque o `.dbc` na pasta do ano (`data/raw/sih/<ano>/` ou `data/raw/cnes/<ano>/`) e converta:
+   ```bash
+   python -m src.converter_dbc
+   ```
+   Ele cria o `.parquet` com o mesmo nome, ao lado do `.dbc`, com todas as colunas como texto.
 3. Atualize os testes de período (`tests/test_sih.py` e `tests/test_cnes.py`), que conferem quantos meses existem e qual é o último.
-4. Rode o pipeline e os testes de qualidade:
+4. Rode o pipeline:
    ```bash
    python -m src.pipeline
-   pytest tests/test_sih.py tests/test_cnes.py tests/test_populacao.py
    ```
-5. Se passarem, promova a staging para a silver e rode todos os testes:
+5. Promova para a silver. O script roda os testes de qualidade e só copia se passarem; depois confere se staging e silver ficaram iguais:
    ```bash
-   cp data/staging/*.parquet data/silver/
-   pytest
+   python -m src.promover_silver
    ```
 6. Gere de novo as tabelas do painel:
    ```bash
@@ -669,9 +677,32 @@ Clique no nome do kernel no canto superior direito do notebook, escolha "Select 
 </details>
 
 <details>
+<summary>🔇 O comando não mostra nada na tela</summary>
+
+No Windows, às vezes o `python` abre o atalho da Microsoft Store, que não faz nada e não mostra erro. Ative o ambiente (`source .venv/Scripts/activate`) ou chame o Python do projeto direto: `.venv/Scripts/python.exe gerar_modelo_bi_girosus.py`. Todos os scripts do projeto mostram mensagens enquanto rodam; se não apareceu nada, o script não rodou.
+</details>
+
+<details>
 <summary>❌ Os testes falham com “arquivo não encontrado”</summary>
 
 Os testes leem `data/staging`, que só existe depois de rodar o pipeline. Rode `python -m src.pipeline` antes do `pytest`.
+</details>
+
+<details>
+<summary>⛔ O push foi recusado por arquivo grande</summary>
+
+O GitHub recusa arquivos acima de 100 MB (como o CSV da `fato_internacoes`). Se ele entrou num commit, colocar no `.gitignore` depois não basta: o commit antigo continua na fila. Refaça os commits locais sem o arquivo:
+
+```bash
+git fetch origin
+git reset --soft origin/main
+git rm -r --cached data/gold/girosus
+git status          # a pasta girosus não pode aparecer em verde
+git commit -m "sua mensagem"
+git push -u origin nome-da-branch
+```
+
+O `reset --soft` não apaga nenhuma alteração, e o `rm --cached` tira o arquivo só do Git, não da sua pasta.
 </details>
 
 <details>
@@ -693,7 +724,7 @@ Eles procuram os arquivos `.dbc`, que não vêm no repositório. Veja [Cuidados:
    ```
    Exemplos de nome: `fix/config`, `docs/readme`, `feat/analise-idade`.
 2. Antes de commitar, confira o que mudou com `git status`.
-3. Não suba `.venv/`, `data/staging/` nem os `.dbc` (já estão no `.gitignore`).
+3. Não suba `.venv/`, `data/staging/`, `data/gold/girosus/` nem os `.dbc` (já estão no `.gitignore`). Se um push for recusado por arquivo grande, veja [O push foi recusado por arquivo grande](#solução-de-problemas).
 4. Envie a branch e abra um pull request para a `main`:
    ```bash
    git push -u origin nome-da-branch
@@ -726,14 +757,13 @@ Atenção: esse comando desfaz **todas** as alterações não commitadas nos not
 | prefect | Organizar (orquestrar) o pipeline |
 | pytest | Rodar os testes |
 | ipykernel | Rodar os notebooks no VS Code |
-| PySUS | Ler os `.dbc` do DATASUS (notebooks `01`, `02` e `04`) |
-| duckdb | Está no `requirements.txt`, mas hoje não é usado |
+| PySUS | Ler e converter os `.dbc` do DATASUS (`src/converter_dbc.py` e notebooks `01`, `02` e `04`) |
 </details>
 
 <details>
 <summary>🔄 Dá para refazer tudo do zero</summary>
 
-Em parte. A partir de `data/raw`, tudo é automático: qualquer pessoa roda `python -m src.pipeline` (ou `python -m src.orchestration.prefect_flow`, que faz o mesmo organizado com Prefect e roda local, sem servidor) e recria a staging. Duas etapas ainda são manuais: baixar e converter os `.dbc` para `.parquet`, e copiar a staging conferida para `data/silver`.
+Sim, com uma etapa manual: baixar os `.dbc` no site do DATASUS. Daí em diante são quatro comandos: `python -m src.converter_dbc`, `python -m src.pipeline` (ou `python -m src.orchestration.prefect_flow`, que faz o mesmo organizado com Prefect e roda local, sem servidor), `python -m src.promover_silver` e `python gerar_modelo_bi_girosus.py`.
 </details>
 
 ## Bases de dados e fontes
@@ -784,12 +814,62 @@ Em parte. A partir de `data/raw`, tudo é automático: qualquer pessoa roda `pyt
 * **Observatório de Saúde Infantil:** projeto no GitHub com dados do SIM e do SIH sobre mortalidade e internações de crianças de 0 a 6 anos. [Acessar](https://github.com/fmdsocial/sim-sih-mortalidade-internacoes-0-6-anos)
 * **SUS Data Analysis:** repositório com análises de dados públicos do SUS. [Acessar](https://github.com/claudioavgo/sus-data-analysis)
 
-## O que ainda falta
+## Status do projeto
 
-* 🖥️ Construir o relatório `.pbix` do GiroSUS no Power BI, seguindo o guia do analista do PDF.
-* 🏷️ Preencher os nomes dos hospitais (`dim_hospital.csv`) e dos procedimentos (`dim_procedimento.csv`).
-* 📏 Trocar o tempo típico (mediana do SIH) pela permanência média oficial da tabela SIGTAP.
-* 👤 Levar idade, sexo e valor da UTI para a silver, para poder separar as análises por faixa etária (crianças, idosos) sem ler os arquivos brutos.
-* 🔄 Script para baixar os `.dbc` do DATASUS e converter para `.parquet`.
-* 📓 Adaptar os notebooks `01`, `02` e `04` para lerem os `.parquet` de `data/raw`, sem depender dos `.dbc`.
-* ⚙️ Etapa automática que copie a staging conferida para `data/silver`.
+O que já existe e o que falta. Legenda: ✅ pronto · ❌ falta.
+
+<details>
+<summary>🗂️ Dados</summary>
+
+* ✅ **Dados brutos** (`data/raw/`): SIH de jan/2021 a jun/2026, CNES de jan/2021 a jul/2026 (Parquet, convertidos do `.dbc` por `src/converter_dbc.py`) e planilhas do IBGE.
+* ✅ **Staging** (`data/staging/`): gerada pelo pipeline, só na sua máquina.
+* ✅ **Silver** (`data/silver/`): SIH, CNES e população, conferidas e promovidas por `src/promover_silver.py`.
+* ✅ **Tabelas do painel** (`data/gold/girosus/`): 8 tabelas em CSV, geradas pelo script, só na sua máquina.
+* ❌ **Download automático** dos `.dbc` do DATASUS: hoje é feito à mão no site.
+</details>
+
+<details>
+<summary>🐍 Código</summary>
+
+* ✅ **Configuração central** (`src/config.py`): anos, estado e caminhos.
+* ✅ **Extração** (`src/extract/`) e **padronização** (`src/transform/`), um módulo por fonte.
+* ✅ **Conversão** `.dbc` → `.parquet` (`src/converter_dbc.py`).
+* ✅ **Pipeline** (`src/pipeline.py`) e **orquestração com Prefect** (`src/orchestration/`), com mensagens na tela.
+* ✅ **Promoção automática** da staging para a silver, com testes antes e depois (`src/promover_silver.py`).
+* ✅ **Script do painel** (`gerar_modelo_bi_girosus.py`): aplica as regras do GiroSUS, gera os CSVs e confere o resultado.
+* ✅ **Testes** (`tests/`): 15 testes com pytest.
+</details>
+
+<details>
+<summary>📓 Análises</summary>
+
+* ✅ **Notebooks 01 a 05**: exploração, consolidação e análise integrada.
+* ✅ **Notebook `06_girosus_ocupacao_leitos`**: análise do GiroSUS, com as 34 perguntas.
+* ❌ **Notebooks 01, 02 e 04** lendo os `.parquet` de `data/raw`: hoje ainda dependem dos `.dbc`.
+</details>
+
+<details>
+<summary>📖 Documentação</summary>
+
+* ✅ **README** (este arquivo), com o [Dicionário de dados](#dicionário-de-dados).
+* ✅ **Dicionário em planilha**: `docs/dicionário/dicionario_dados.csv`.
+* ✅ **PDF do produto**: `dashboard/GiroSUS_painel_ocupacao_leitos.pdf` (pitch, 34 perguntas e guia do analista).
+* ✅ **PDF do código**: `docs/code/como_funciona.pdf` (metodologia, pasta por pasta).
+</details>
+
+<details>
+<summary>📊 Produto (Power BI), com o time de BI</summary>
+
+* ✅ **Modelo desenhado**: 2 fatos, 6 dimensões, 22 medidas DAX e o parâmetro "Redução %" (no PDF do produto).
+* ❌ **Arquivo `.pbix`** montado.
+* ❌ **Painel publicado**, com link, no Power BI Service.
+* ❌ **Nomes dos hospitais e dos procedimentos** (`dim_hospital.csv` e `dim_procedimento.csv`): hoje o painel mostra só os códigos.
+</details>
+
+<details>
+<summary>🔭 Próximas evoluções</summary>
+
+* ❌ Trocar o tempo típico (mediana do SIH) pela permanência média oficial da tabela SIGTAP.
+* ❌ Levar o valor da UTI (`VAL_UTI`) para a silver; hoje o script do painel lê direto de `data/raw/sih`.
+* ❌ Recortes por faixa etária e sexo no painel (as colunas já estão na silver).
+</details>

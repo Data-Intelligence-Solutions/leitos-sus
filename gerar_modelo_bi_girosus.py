@@ -5,15 +5,16 @@ Gera as tabelas do modelo de BI do produto GiroSUS, prontas para o Power BI.
 GiroSUS: ocupação de leitos do SUS em Goiás, medida em leito-dia
 (um paciente ocupando um leito por um dia), olhando todas as causas.
 O desenho do modelo está em dashboard/GiroSUS_painel_ocupacao_leitos.pdf
-(guia do analista) e os números batem com notebooks/06_analise_respiratoria.ipynb.
+(guia do analista) e os números batem com notebooks/06_girosus_ocupacao_leitos.ipynb.
 
 Como usar:
     1. Ative o ambiente virtual do projeto (.venv).
     2. Rode no terminal, na pasta do projeto:
            python gerar_modelo_bi_girosus.py
-    3. As 8 tabelas aparecem em data/gold/girosus/, cada uma em .csv e em .parquet.
+    3. As 8 tabelas aparecem em data/gold/girosus/, todas em .csv (nenhum .parquet).
        Os .csv usam o padrão brasileiro (separador ";" e decimal ","), que o
-       Excel e o Power BI em português leem direto.
+       Excel e o Power BI em português leem direto. Se houver .parquet antigos
+       nessa pasta, o script apaga para não confundir.
        Atenção: os arquivos soltos em data/gold/ (sem a subpasta girosus)
        são do modelo respiratório antigo e NÃO são do painel.
     4. No fim, o script confere se as 8 tabelas e todas as colunas existem.
@@ -218,12 +219,9 @@ def montar_dim_tempo() -> pd.DataFrame:
     return dim
 
 
-def gravar(tabela: pd.DataFrame, caminho: Path, formato: str) -> None:
+def gravar(tabela: pd.DataFrame, caminho: Path) -> None:
     try:
-        if formato == "parquet":
-            tabela.to_parquet(caminho, index=False)
-        else:
-            tabela.to_csv(caminho, index=False, encoding="utf-8-sig", sep=";", decimal=",")
+        tabela.to_csv(caminho, index=False, encoding="utf-8-sig", sep=";", decimal=",")
     except PermissionError:
         raise SystemExit(
             f"\nERRO: nao consegui gravar {caminho.name}. O arquivo esta aberto em outro "
@@ -236,18 +234,19 @@ def conferir_saida() -> None:
     problemas = []
     print("\nConferencia dos arquivos gerados:")
     for nome_tabela, colunas in TABELAS_ESPERADAS.items():
-        caminho = PASTA_SAIDA / f"{nome_tabela}.parquet"
-        if not (PASTA_SAIDA / f"{nome_tabela}.csv").exists():
-            problemas.append(f"{nome_tabela}.csv nao foi gerado")
+        caminho = PASTA_SAIDA / f"{nome_tabela}.csv"
         if not caminho.exists():
-            problemas.append(f"{nome_tabela}.parquet nao foi gerado")
+            problemas.append(f"{nome_tabela}.csv nao foi gerado")
             continue
-        existentes = pd.read_parquet(caminho).columns
+        existentes = pd.read_csv(caminho, sep=";", nrows=0, encoding="utf-8-sig").columns
         faltando = [c for c in colunas if c not in existentes]
         if faltando:
-            problemas.append(f"{nome_tabela}.parquet sem as colunas {faltando}")
+            problemas.append(f"{nome_tabela}.csv sem as colunas {faltando}")
         else:
-            print(f"  OK  {nome_tabela} (.csv e .parquet, {len(colunas)} colunas)")
+            print(f"  OK  {nome_tabela}.csv ({len(colunas)} colunas)")
+    sobras = sorted(p.name for p in PASTA_SAIDA.glob("*.parquet"))
+    if sobras:
+        problemas.append(f"ainda ha .parquet na pasta: {sobras}")
     if problemas:
         raise SystemExit("\nERRO na saida:\n  - " + "\n  - ".join(problemas))
 
@@ -296,6 +295,11 @@ def main() -> None:
     ocupacao = montar_fato_ocupacao(fato, grupos)
 
     PASTA_SAIDA.mkdir(parents=True, exist_ok=True)
+    for antigo in PASTA_SAIDA.glob("*.parquet"):  # versões antigas: a saída agora é só CSV
+        try:
+            antigo.unlink()
+        except PermissionError:
+            raise SystemExit(f"\nERRO: nao consegui apagar {antigo.name}. Feche o Power BI e rode de novo.")
     tabelas = {
         "fato_internacoes": fato,
         "fato_ocupacao_diaria": ocupacao,
@@ -307,8 +311,7 @@ def main() -> None:
         "dim_municipio_atendimento": dim_municipio,
     }
     for nome_tabela, tabela in tabelas.items():
-        gravar(tabela, PASTA_SAIDA / f"{nome_tabela}.parquet", "parquet")
-        gravar(tabela, PASTA_SAIDA / f"{nome_tabela}.csv", "csv")
+        gravar(tabela, PASTA_SAIDA / f"{nome_tabela}.csv")
         print(f"Gerado: {nome_tabela} ({len(tabela):,} linhas)")
 
     # Conferência com o material do produto (safra 2025)
