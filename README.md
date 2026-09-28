@@ -1,4 +1,4 @@
-# leitos-sus
+# GiroSus - /leitos-sus
 
 Projeto de análise da demanda hospitalar em Goiás com dados públicos do SUS (SIH e CNES) e do IBGE. A ideia é entender onde e como as internações apertam a rede de saúde.
 
