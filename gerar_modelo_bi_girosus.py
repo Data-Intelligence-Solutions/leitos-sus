@@ -9,10 +9,15 @@ O desenho do modelo está em dashboard/GiroSUS_painel_ocupacao_leitos.pdf
 
 Como usar:
     1. Ative o ambiente virtual do projeto (.venv).
-    2. Rode a partir da RAIZ do projeto:
+    2. Rode no terminal, na pasta do projeto:
            python gerar_modelo_bi_girosus.py
-    3. As tabelas aparecem em data/gold/girosus/ (.parquet para o Power BI;
-       as tabelas pequenas também em .csv, para preencher nomes à mão).
+    3. As 8 tabelas aparecem em data/gold/girosus/, cada uma em .csv e em .parquet.
+       Os .csv usam o padrão brasileiro (separador ";" e decimal ","), que o
+       Excel e o Power BI em português leem direto.
+       Atenção: os arquivos soltos em data/gold/ (sem a subpasta girosus)
+       são do modelo respiratório antigo e NÃO são do painel.
+    4. No fim, o script confere se as 8 tabelas e todas as colunas existem.
+       Se faltar algo, ele para com ERRO e diz o que faltou.
 
 Regras de negócio:
     - Só AIH regular (IDENT = "1"). As AIHs de continuação (IDENT = "5")
@@ -35,10 +40,29 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-ARQUIVO_SIH = Path("data/silver/sih_multianual.parquet")
-ARQUIVO_POPULACAO = Path("data/silver/populacao_multianual.parquet")
-PASTA_RAW_SIH = Path("data/raw/sih")
-PASTA_SAIDA = Path("data/gold/girosus")
+# Caminhos a partir da pasta deste script: funciona de qualquer pasta do terminal.
+RAIZ = Path(__file__).resolve().parent
+ARQUIVO_SIH = RAIZ / "data/silver/sih_multianual.parquet"
+ARQUIVO_POPULACAO = RAIZ / "data/silver/populacao_multianual.parquet"
+PASTA_RAW_SIH = RAIZ / "data/raw/sih"
+PASTA_SAIDA = RAIZ / "data/gold/girosus"
+
+# O que precisa existir no fim: tabela -> colunas obrigatórias.
+TABELAS_ESPERADAS = {
+    "fato_internacoes": [
+        "chave_aih", "safra", "competencia", "data_internacao", "data_saida", "cnes",
+        "munic_residencia", "munic_atendimento", "cid", "proc_rea", "leito_dias",
+        "tempo_tipico", "dias_acima_tipico", "faixa_duracao", "ordem_faixa",
+        "fl_fora_municipio", "fl_uti", "dias_uti", "valor_pago", "valor_uti",
+    ],
+    "fato_ocupacao_diaria": ["cnes", "data", "grupo_doenca", "pacientes_internados", "entradas", "altas"],
+    "dim_tempo": ["data", "ano", "mes", "nome_mes", "ano_mes", "trimestre", "dia_semana", "nome_dia", "fl_fim_semana"],
+    "dim_diagnostico": ["cid", "capitulo", "grupo_doenca"],
+    "dim_procedimento": ["proc_rea", "diagnostico_mais_comum", "tempo_tipico_2025", "nome_procedimento"],
+    "dim_hospital": ["cnes", "municipio_atendimento", "nome_municipio", "nome_hospital"],
+    "dim_municipio_residencia": ["codigo", "nome", "uf", "fl_goias"],
+    "dim_municipio_atendimento": ["codigo", "nome", "uf", "fl_goias"],
+}
 
 INICIO_CALENDARIO = pd.Timestamp("2021-01-01")
 FIM_CALENDARIO = pd.Timestamp("2026-06-30")
@@ -71,7 +95,8 @@ def classificar_grupo(cid) -> str:
 def carregar_sih() -> pd.DataFrame:
     if not ARQUIVO_SIH.exists():
         raise FileNotFoundError(
-            f"Nao encontrei {ARQUIVO_SIH}. Rode este script a partir da raiz do projeto."
+            f"Nao encontrei {ARQUIVO_SIH}. A pasta data/silver precisa estar no projeto "
+            "(ela vem do Git ou da promocao da staging)."
         )
     df = pd.read_parquet(ARQUIVO_SIH)
     return df[df["IDENT"].astype(str) == "1"].copy()
@@ -193,7 +218,42 @@ def montar_dim_tempo() -> pd.DataFrame:
     return dim
 
 
+def gravar(tabela: pd.DataFrame, caminho: Path, formato: str) -> None:
+    try:
+        if formato == "parquet":
+            tabela.to_parquet(caminho, index=False)
+        else:
+            tabela.to_csv(caminho, index=False, encoding="utf-8-sig", sep=";", decimal=",")
+    except PermissionError:
+        raise SystemExit(
+            f"\nERRO: nao consegui gravar {caminho.name}. O arquivo esta aberto em outro "
+            "programa (Excel ou Power BI). Feche e rode o script de novo."
+        )
+
+
+def conferir_saida() -> None:
+    """Confere se as 8 tabelas existem e têm todas as colunas. Para com erro se faltar algo."""
+    problemas = []
+    print("\nConferencia dos arquivos gerados:")
+    for nome_tabela, colunas in TABELAS_ESPERADAS.items():
+        caminho = PASTA_SAIDA / f"{nome_tabela}.parquet"
+        if not (PASTA_SAIDA / f"{nome_tabela}.csv").exists():
+            problemas.append(f"{nome_tabela}.csv nao foi gerado")
+        if not caminho.exists():
+            problemas.append(f"{nome_tabela}.parquet nao foi gerado")
+            continue
+        existentes = pd.read_parquet(caminho).columns
+        faltando = [c for c in colunas if c not in existentes]
+        if faltando:
+            problemas.append(f"{nome_tabela}.parquet sem as colunas {faltando}")
+        else:
+            print(f"  OK  {nome_tabela} (.csv e .parquet, {len(colunas)} colunas)")
+    if problemas:
+        raise SystemExit("\nERRO na saida:\n  - " + "\n  - ".join(problemas))
+
+
 def main() -> None:
+    print(f"Gerando as tabelas do GiroSUS em: {PASTA_SAIDA}")
     print("Carregando SIH (AIH regular)...")
     df = carregar_sih()
     uti = carregar_valor_uti()
@@ -246,12 +306,9 @@ def main() -> None:
         "dim_municipio_residencia": dim_municipio,
         "dim_municipio_atendimento": dim_municipio,
     }
-    tabelas_csv = {"dim_diagnostico", "dim_procedimento", "dim_hospital", "dim_municipio_residencia"}
-
     for nome_tabela, tabela in tabelas.items():
-        tabela.to_parquet(PASTA_SAIDA / f"{nome_tabela}.parquet", index=False)
-        if nome_tabela in tabelas_csv:
-            tabela.to_csv(PASTA_SAIDA / f"{nome_tabela}.csv", index=False, encoding="utf-8-sig")
+        gravar(tabela, PASTA_SAIDA / f"{nome_tabela}.parquet", "parquet")
+        gravar(tabela, PASTA_SAIDA / f"{nome_tabela}.csv", "csv")
         print(f"Gerado: {nome_tabela} ({len(tabela):,} linhas)")
 
     # Conferência com o material do produto (safra 2025)
@@ -261,7 +318,8 @@ def main() -> None:
     print(f"  Leitos-dia:         {s['leito_dias'].sum():,.0f}  (esperado 1.835.227)")
     print(f"  Valor pago (R$ mi): {s['valor_pago'].sum() / 1e6:,.1f}  (esperado 726,1)")
     print(f"  % acima do tipico:  {s['dias_acima_tipico'].sum() / s['leito_dias'].sum() * 100:.1f}  (esperado 43,9)")
-    print("\nPronto. Tabelas em data/gold/girosus/.")
+    conferir_saida()
+    print(f"\nPronto. As 8 tabelas do Power BI estao em: {PASTA_SAIDA}")
 
 
 if __name__ == "__main__":

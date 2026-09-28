@@ -21,3 +21,6 @@ data/staging/
 
 # Ambiente virtual
 .venv/
+
+# Tabelas do painel GiroSUS (geradas pelo script, grandes demais para o Git)
+data/gold/girosus/
