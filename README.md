@@ -1,215 +1,155 @@
 # leitos-sus
 
-Análise da demanda hospitalar em Goiás usando dados públicos do SUS (SIH e CNES) e do IBGE, com foco em entender onde e como as internações pressionam a rede de saúde.
+Projeto de análise da demanda hospitalar em Goiás com dados públicos do SUS (SIH e CNES) e do IBGE. A ideia é entender onde e como as internações apertam a rede de saúde.
 
-O produto do projeto é o **GiroSUS**: um painel no Power BI que mostra **quem ocupa os leitos do SUS em Goiás, por quanto tempo e quanto isso custa**, olhando todas as causas de internação e medindo em leito-dia. Material completo do produto (pitch, gráficos, perguntas, guia do analista e método): [`dashboard/GiroSUS_painel_ocupacao_leitos.pdf`](dashboard/GiroSUS_painel_ocupacao_leitos.pdf).
+O produto final é o **GiroSUS**: um painel no Power BI que mostra **quem ocupa os leitos do SUS em Goiás, por quanto tempo e quanto isso custa**. Ele olha todas as causas de internação e mede tudo em **leito-dia** (um paciente ocupando um leito por um dia).
+
+> **Em 30 segundos:** os dados do SUS entram em `data/raw`, o código limpa e organiza, os testes conferem, o script `gerar_modelo_bi_girosus.py` monta as tabelas do painel e o Power BI mostra o resultado. O material completo do produto (pitch, gráficos, perguntas, guia do analista e método) está em [`dashboard/GiroSUS_painel_ocupacao_leitos.pdf`](dashboard/GiroSUS_painel_ocupacao_leitos.pdf).
 
 ## Sumário
 
-* [Como rodar o projeto](#como-rodar-o-projeto)
 * [O produto GiroSUS](#o-produto-girosus)
-* [Modelo do Power BI (GiroSUS)](#modelo-do-power-bi-girosus)
-* [Estrutura do projeto](#estrutura-do-projeto)
-* [Fluxo dos dados](#fluxo-dos-dados)
-* [Como funciona o negócio](#como-funciona-o-negócio)
-* [Como funcionam os notebooks](#como-funcionam-os-notebooks)
-* [Como funcionam os testes](#como-funcionam-os-testes)
-* [Como funciona o pipeline](#como-funciona-o-pipeline)
+* [Onde está cada coisa](#onde-está-cada-coisa)
+* [Como rodar o projeto](#como-rodar-o-projeto)
+* [Como os dados andam](#como-os-dados-andam)
+* [Regras de negócio](#regras-de-negócio)
+* [Modelo do Power BI](#modelo-do-power-bi)
+* [Dicionário de dados](#dicionário-de-dados)
+* [Notebooks](#notebooks)
+* [Testes](#testes)
 * [Como atualizar os dados](#como-atualizar-os-dados)
 * [Solução de problemas](#solução-de-problemas)
 * [Como contribuir](#como-contribuir)
 * [Perguntas frequentes](#perguntas-frequentes)
+* [Bases de dados e fontes](#bases-de-dados-e-fontes)
 * [Referências e benchmarks](#referências-e-benchmarks)
-* [Datasets utilizados](#datasets-utilizados)
 * [O que ainda falta](#o-que-ainda-falta)
-
-## Como rodar o projeto (terminal GIT)
-
-Requisito: Python 3.12.
-
-```bash
-# Crie o ambiente virtual
-py -3.12 -m venv .venv
-
-# Ative o ambiente virtual
-source .venv/Scripts/activate
-
-# Instale as dependências
-pip install -r requirements.txt
-```
-
-### Gerar as tabelas (CSV e Parquet) do painel GiroSUS no Power BI
-
-Com o ambiente ativo, na raiz do projeto:
-
-```bash
-python gerar_modelo_bi_girosus.py
-```
-
-Esse comando cria a pasta `data/gold/girosus/` com os 8 arquivos que o Power BI importa (`.parquet`, e `.csv` das tabelas pequenas). Leva cerca de 1 minuto e, no final, imprime os totais da safra 2025 para conferência: 457.403 internações, 1.835.227 leitos-dia, R$ 726,1 milhões e 43,9% acima do tempo típico. Rode de novo sempre que a base `data/silver` for atualizada. Detalhes em [Modelo do Power BI (GiroSUS)](#modelo-do-power-bi-girosus).
-
-Para rodar os notebooks no VS Code, abra a pasta do projeto: o arquivo `.vscode/settings.json` já seleciona o Python do `.venv` e o `ipykernel` vem no `requirements.txt`, então não é preciso instalar nem escolher kernel manualmente.
-
-```bash
-## [ERRO] ao rodar o projeto? siga esses passos
-# Remova manualmente a pasta .venv
-# Verifique a versão do python (precisa ser a 3.12.X)
-python --version
-
-# Crie o ambiente virtual
-py -3.12 -m venv .venv
-
-# Ative o ambiente virtual
-source .venv/Scripts/activate
-
-# Instale as dependências
-pip install -r requirements.txt
-```
 
 ## O produto GiroSUS
 
 <details>
-<summary>🎯 O que é e qual dor resolve</summary>
+<summary>🎯 O que é e qual problema resolve</summary>
 
-Contar internações esconde o que pesa na rede: um paciente que fica 30 dias ocupa o mesmo leito que dez pacientes de 3 dias. O GiroSUS mede a rede em **leito-dia** (um paciente ocupando um leito por um dia) e mostra quem ocupa os leitos, por quanto tempo e quanto o SUS paga por eles. O nome vem de “giro de leito”, o indicador de quantas vezes um leito recebe um novo paciente.
+Contar internações esconde o que realmente pesa na rede: um paciente que fica 30 dias ocupa o mesmo leito que dez pacientes de 3 dias. Por isso o GiroSUS mede em **leito-dia** e mostra quem ocupa os leitos, por quanto tempo e quanto o SUS paga por eles. O nome vem de “giro de leito”, o indicador de quantas vezes um leito recebe um paciente novo.
 
-Como o SUS paga um pacote fixo por procedimento, cada dia de internação além do necessário é um leito a menos para outro paciente e um custo que o hospital banca. O painel serve para **planejar**: o dado chega com 1 a 2 meses de atraso, então ele não mostra vaga em tempo real.
+Por que isso importa: o SUS paga um pacote fixo por procedimento. Então cada dia a mais de internação, além do necessário, é um leito a menos para outro paciente e um custo que o hospital banca sozinho.
 
-Para quem: diretores de hospital, Secretaria Estadual e secretarias municipais de saúde.
+O painel serve para **planejar**, não para achar vaga agora: o dado do SUS chega com 1 a 2 meses de atraso.
+
+**Para quem:** diretores de hospital, Secretaria Estadual de Saúde e secretarias municipais.
 </details>
 
 <details>
 <summary>📦 Base, safra e números principais</summary>
 
-* **Base:** somente SIH/SUS (`data/silver/sih_multianual.parquet`). A base de população do IBGE entra apenas para dar nome aos municípios.
-* **Safra:** competências de janeiro a dezembro de 2025, só AIH regular (IDENT = 1). O histórico de 2021 a jun/2026 fica no modelo como filtro de tendência.
-* **Números de 2025:** 457.403 internações, 1.835.227 leitos-dia, R$ 726,1 milhões pagos, permanência média de 4,0 dias, R$ 396 por leito-dia.
+* **Base:** só o SIH/SUS (`data/silver/sih_multianual.parquet`). A base de população do IBGE entra apenas para dar nome aos municípios.
+* **Safra:** competências de janeiro a dezembro de 2025, só AIH regular (IDENT = 1). O histórico de 2021 a junho de 2026 fica no modelo para ver tendência.
+* **Números de 2025:** 457.403 internações, 1.835.227 leitos-dia, R$ 726,1 milhões pagos, permanência média de 4,0 dias e R$ 396 por leito-dia.
+</details>
 
-O que o painel já mostra:
+<details>
+<summary>📈 O que o painel já mostra</summary>
 
 * O respiratório é só a 4ª causa de internação, mas a 2ª que mais ocupa leito (12,5% dos leitos-dia e 8,9% do valor pago). O circulatório é o contrário: 11,9% dos leitos e 21% do valor.
-* Internações de mais de 15 dias são 4,4% dos pacientes e ocupam 27,3% dos leitos-dia.
+* Internações de mais de 15 dias são 4,4% dos pacientes, mas ocupam 27,3% dos leitos-dia.
 * 43,9% dos leitos-dia ficaram acima do tempo típico do procedimento. Reduzir 10% desses dias equivale a cerca de 20 mil internações a mais por ano, com os mesmos leitos.
 * Goiânia concentra 44,7% dos leitos-dia do estado, e 56,6% deles são usados por moradores de outras cidades.
+
+Antes do GiroSUS, o projeto fez uma análise só de doenças respiratórias (continua no histórico do Git). Ela mostrou que essas internações são cerca de 9% do total em Goiás, com pico entre abril e junho; que municípios menores têm mais internação por habitante; e que, comparadas às demais, têm mais que o dobro de mortalidade, ficam mais tempo e usam UTI quase duas vezes mais.
 </details>
 
-<details>
-<summary>📄 Onde está cada material</summary>
+## Onde está cada coisa
 
-| Material | Onde | Para quem |
+<details>
+<summary>📄 Os materiais do projeto e para quem é cada um</summary>
+
+| Material | Onde está | Para quem |
 |---|---|---|
-| Material do produto (pitch, 7 páginas do painel com gráficos, 34 perguntas, perguntas de cliente e banca, guia do analista, método) | `dashboard/GiroSUS_painel_ocupacao_leitos.pdf` | Clientes, analistas e avaliadores |
-| Análise com todos os números | `notebooks/06_analise_respiratoria.ipynb` | Analistas |
-| Tabelas do Power BI | `gerar_modelo_bi_girosus.py` → `data/gold/girosus/` | Analista de BI |
+| Material do produto: pitch, 7 páginas do painel com gráficos, 34 perguntas, perguntas de cliente e banca, guia do analista e método | `dashboard/GiroSUS_painel_ocupacao_leitos.pdf` | Clientes, analistas e avaliadores |
+| Análise com todos os números do GiroSUS | `notebooks/06_analise_respiratoria.ipynb` | Analistas |
+| Tabelas que o Power BI importa | geradas por `gerar_modelo_bi_girosus.py` em `data/gold/girosus/` | Analista de BI |
+| O que significa cada coluna | seção [Dicionário de dados](#dicionário-de-dados) e `docs/dicionário/dicionario_dados.csv` | Todo mundo |
+| Como o código funciona, pasta por pasta | `docs/code/como_funciona.pdf` | Quem vai mexer no código |
 </details>
 
-## Modelo do Power BI (GiroSUS)
+<details>
+<summary>🗂️ As pastas e o que cada uma faz</summary>
+
+```
+leitos-sus/
+├── 📊 dashboard/                  # Material do produto GiroSUS (PDF)
+├── 🗂️ data/
+│   ├── raw/                        # Dados originais: SIH e CNES em Parquet, IBGE em planilhas
+│   ├── staging/                    # O que o pipeline gera (fica só na sua máquina, não vai para o Git)
+│   ├── silver/                     # Bases conferidas pelos testes; é daqui que as análises leem
+│   └── gold/girosus/               # Tabelas prontas para o Power BI
+├── 📖 docs/
+│   ├── dicionário/                 # dicionario_dados.csv: o dicionário em planilha
+│   └── code/                       # como_funciona.pdf: explicação do código
+├── 📓 notebooks/                   # Exploração e análises (06 = GiroSUS)
+├── 🐍 src/
+│   ├── config.py                   # Caminhos e parâmetros (anos, estado) num lugar só
+│   ├── pipeline.py                 # Roda o ETL: extrai, padroniza e grava na staging
+│   ├── extract/                    # Lê os arquivos de cada fonte (SIH, CNES, IBGE)
+│   ├── transform/                  # Padroniza os dados de cada fonte
+│   └── orchestration/              # O mesmo pipeline, organizado com Prefect
+├── ✅ tests/                       # Testes de qualidade (pytest)
+├── gerar_modelo_bi_girosus.py      # Monta as tabelas do Power BI em data/gold/girosus
+├── requirements.txt                # Bibliotecas do projeto
+└── README.md                       # Este arquivo
+```
+</details>
+
+## Como rodar o projeto
+
+Você precisa do **Python 3.12**. Todos os comandos abaixo são para o terminal Git Bash, na pasta raiz do projeto.
 
 <details>
-<summary>▶️ Como gerar as tabelas</summary>
+<summary>1️⃣ Preparar o ambiente (só na primeira vez)</summary>
 
-Na raiz do projeto, com o ambiente ativo:
+```bash
+# Cria o ambiente virtual (uma "caixinha" com as bibliotecas do projeto)
+py -3.12 -m venv .venv
+
+# Ativa o ambiente (faça isso sempre que abrir um terminal novo)
+source .venv/Scripts/activate
+
+# Instala as bibliotecas
+pip install -r requirements.txt
+```
+
+Deu erro? Veja [O ambiente não instala ou dá erro](#solução-de-problemas).
+</details>
+
+<details>
+<summary>2️⃣ Gerar as tabelas do painel GiroSUS (o principal)</summary>
+
+Com o ambiente ativo:
 
 ```bash
 python gerar_modelo_bi_girosus.py
 ```
 
-Leva cerca de 1 minuto. O script lê `data/silver`, aplica as regras do GiroSUS e grava as tabelas em `data/gold/girosus/`. O valor da UTI (`VAL_UTI`) ainda não está na silver, então o script o lê dos arquivos brutos de `data/raw/sih`; sem eles, só a coluna `valor_uti` fica vazia.
+O que acontece: o script lê `data/silver`, aplica as regras do GiroSUS e grava as 8 tabelas do Power BI em `data/gold/girosus/` (em `.parquet`, e as pequenas também em `.csv`). Leva cerca de 1 minuto.
 
-Ao final, o script imprime a conferência da safra 2025, que precisa bater com o PDF e o notebook 06: 457.403 internações, 1.835.227 leitos-dia, R$ 726,1 milhões e 43,9% dos leitos-dia acima do típico.
+No final, ele imprime a conferência da safra 2025. Esses números precisam bater com o PDF e com o notebook 06: **457.403 internações, 1.835.227 leitos-dia, R$ 726,1 milhões e 43,9% dos leitos-dia acima do típico**.
+
+Rode de novo sempre que `data/silver` for atualizada.
 </details>
 
 <details>
-<summary>🗃️ As tabelas geradas</summary>
+<summary>3️⃣ Abrir os notebooks</summary>
 
-| Arquivo | Cada linha é | Linhas |
-|---|---|---|
-| `fato_internacoes` | Uma internação (AIH regular), todas as safras | 2,2 milhões |
-| `fato_ocupacao_diaria` | Um hospital, num dia, num grupo de doença (internados, entradas, altas) | 2,0 milhões |
-| `dim_tempo` | Um dia do calendário (2020 a 2026) | 2.557 |
-| `dim_diagnostico` | Um código CID-10, com o grupo de doença | 8.327 |
-| `dim_procedimento` | Um procedimento SIGTAP | 1.586 |
-| `dim_hospital` | Um hospital (CNES) | 303 |
-| `dim_municipio_residencia` e `dim_municipio_atendimento` | Um município (mesma tabela, uma para cada lado da relação) | 2.362 |
-
-Todas saem em `.parquet`. As tabelas `dim_diagnostico`, `dim_procedimento`, `dim_hospital` e `dim_municipio_residencia` também saem em `.csv`. Em `dim_hospital.csv` e `dim_procedimento.csv` há colunas de nome em branco (`nome_hospital` e `nome_procedimento`) para preencher à mão, pela consulta pública do CNES e pela tabela SIGTAP.
-
-A `fato_internacoes.parquet` tem mais de 40 MB. Avalie com o grupo se ela deve ir para o Git ou ser gerada por cada pessoa.
+Abra a pasta do projeto no VS Code. O arquivo `.vscode/settings.json` já escolhe o Python do `.venv`, e o `ipykernel` vem no `requirements.txt`, então não precisa instalar nem escolher kernel na mão.
 </details>
 
 <details>
-<summary>📖 Dicionário de dados da fato_internacoes</summary>
+<summary>4️⃣ Refazer as bases do zero (opcional)</summary>
 
-| Coluna | O que é | Origem no SIH / regra |
-|---|---|---|
-| `chave_aih` | Número da internação | N_AIH |
-| `safra` | Ano de apresentação para pagamento (filtro principal: 2025) | ANO_CMPT |
-| `competencia` | Mês de apresentação (1º dia do mês) | ANO_CMPT + MES_CMPT |
-| `data_internacao` / `data_saida` | Entrada e saída do paciente | DT_INTER / DT_SAIDA |
-| `cnes` | Hospital | CNES |
-| `munic_residencia` / `munic_atendimento` | Onde o paciente mora / onde fica o hospital | MUNIC_RES / MUNIC_MOV |
-| `cid` | Diagnóstico principal | DIAG_PRINC |
-| `proc_rea` | Procedimento realizado | PROC_REA |
-| `leito_dias` | Dias de internação = leitos-dia | DIAS_PERM |
-| `tempo_tipico` | Mediana de dias do mesmo procedimento na mesma safra | mediana(DIAS_PERM) |
-| `dias_acima_tipico` | Dias além do tempo típico | max(0, leito_dias − tempo_tipico) |
-| `faixa_duracao` / `ordem_faixa` | 0 dia, 1–3, 4–7, 8–15, 16–30, > 30 / ordem para classificar | leito_dias |
-| `fl_fora_municipio` | 1 = internado fora do município onde mora | MUNIC_RES ≠ MUNIC_MOV |
-| `fl_uti` / `dias_uti` | Passou pela UTI / dias de UTI | UTI_MES_TO |
-| `valor_pago` | Valor pago pelo SUS (não é o custo real do hospital) | VAL_TOT |
-| `valor_uti` | Parte do valor paga pela UTI | VAL_UTI (arquivos brutos) |
-
-As demais tabelas estão descritas no guia do analista do PDF (páginas 20 e 21).
+Só é preciso se você mudou algo em `data/raw` ou em `src/`. O passo a passo completo está em [Como atualizar os dados](#como-atualizar-os-dados).
 </details>
 
-<details>
-<summary>🔗 Relacionamentos e montagem no Power BI</summary>
-
-Relacionamentos (todos 1 para muitos e ativos):
-
-* `dim_tempo[data]` → `fato_internacoes[data_internacao]` e `fato_ocupacao_diaria[data]`
-* `dim_hospital[cnes]` → `fato_internacoes[cnes]` e `fato_ocupacao_diaria[cnes]`
-* `dim_diagnostico[cid]` → `fato_internacoes[cid]`
-* `dim_procedimento[proc_rea]` → `fato_internacoes[proc_rea]`
-* `dim_municipio_residencia[codigo]` → `fato_internacoes[munic_residencia]`
-* `dim_municipio_atendimento[codigo]` → `fato_internacoes[munic_atendimento]`
-
-Depois de importar:
-
-* Marque `dim_tempo` como tabela de datas.
-* Classifique `nome_mes` por `mes`, `nome_dia` por `dia_semana` e `faixa_duracao` por `ordem_faixa`.
-* Use filtro `fato_internacoes[safra] = 2025` nas páginas 1 a 6, e `dim_tempo[ano] = 2025` na página do calendário, porque a safra não filtra a tabela de ocupação.
-* Crie o parâmetro **Redução %** (de 0,05 a 0,30).
-
-As medidas DAX (22) e o mapa de cada gráfico (visual, colunas, medida e filtro) estão no PDF, nas páginas 22 a 24.
-</details>
-
-## Estrutura do projeto
-
-```
-leitos-sus/
-├── 📊 dashboard/         # Painel GiroSUS: GiroSUS_painel_ocupacao_leitos.pdf (especificação e material do produto)
-├── 🗂️ data/
-│   ├── raw/               # Dados de origem: SIH e CNES em Parquet (convertidos do DBC), IBGE em planilhas
-│   ├── staging/           # Saída do pipeline (gerada localmente, não vai para o Git)
-│   ├── silver/            # Bases consolidadas e validadas, usadas nas análises
-│   └── gold/girosus/      # Tabelas prontas para o Power BI (geradas por gerar_modelo_bi_girosus.py)
-├── 📖 dicionario_dados/  # Dicionário de dados: o que é cada coluna (README.md para ler, .csv para filtrar)
-├── 🧭 modelagem_bi/      # Documentos de apoio da modelagem (versões anteriores e estudos de produto)
-├── 📓 notebooks/         # Jupyter notebooks de exploração e análise (06 = análise do GiroSUS)
-├── 🐍 src/
-│   ├── config.py           # Caminhos e parâmetros do projeto
-│   ├── pipeline.py          # Execução local do pipeline (ETL)
-│   ├── extract/            # Extração dos dados por fonte (SIH, CNES, IBGE)
-│   ├── transform/           # Tratamento e padronização dos dados
-│   └── orchestration/      # Orquestração do pipeline com Prefect
-├── ✅ tests/             # Testes automatizados (pytest)
-├── gerar_modelo_bi_girosus.py  # Gera as tabelas do Power BI em data/gold/girosus
-├── requirements.txt       # Dependências do projeto
-└── README.md
-```
-
-## Fluxo dos dados
+## Como os dados andam
 
 ```
 DATASUS (.dbc)  ──conversão──▶  data/raw/sih, data/raw/cnes (.parquet)
@@ -220,9 +160,9 @@ IBGE (.xls/.xlsx) ───────────▶  data/raw/ibge
                                      │
                                      ▼
                          data/staging/*.parquet
-                                     │  pytest valida
+                                     │  pytest confere
                                      ▼
-                         data/silver/*.parquet  (cópia validada, feita à mão)
+                         data/silver/*.parquet  (cópia conferida, feita à mão)
                                      │
                                      ▼
                       notebooks 05 e 06 (análises)
@@ -242,199 +182,414 @@ IBGE (.xls/.xlsx) ───────────▶  data/raw/ibge
 
 | Etapa | Onde acontece | Resultado |
 |---|---|---|
-| Download dos arquivos mensais do SIH (RD) e do CNES (LT) | Manual, no site do DATASUS | Arquivos `.dbc` |
-| Conversão de `.dbc` para `.parquet` | Feita fora do pipeline (os `.dbc` são lidos com o PySUS). O script dessa conversão ainda não está no repositório | `data/raw/sih/<ano>/RDGO*.parquet` e `data/raw/cnes/<ano>/LTGO*.parquet` |
-| Download das planilhas de população | Manual, no FTP do IBGE | `data/raw/ibge/...` |
-| Extração e transformação | `src/pipeline.py` ou o flow do Prefect | `data/staging/*.parquet` |
-| Validação | `pytest` | Confere a qualidade da staging e se ela é igual à silver |
-| Promoção para silver | Manual: copiar os arquivos validados de `data/staging` para `data/silver`. Ainda não existe script para isso | `data/silver/*.parquet` |
-| Análises | Notebooks `05` e `06` | Leem apenas `data/silver` |
-| Tabelas do Power BI | `python gerar_modelo_bi_girosus.py` | `data/gold/girosus/*.parquet` (e `.csv` das tabelas pequenas) |
+| Baixar os arquivos mensais do SIH (RD) e do CNES (LT) | À mão, no site do DATASUS | Arquivos `.dbc` |
+| Converter `.dbc` para `.parquet` | Fora do pipeline, com o PySUS. O script dessa conversão ainda não está no repositório | `data/raw/sih/<ano>/RDGO*.parquet` e `data/raw/cnes/<ano>/LTGO*.parquet` |
+| Baixar as planilhas de população | À mão, no FTP do IBGE | `data/raw/ibge/...` |
+| Extrair e padronizar | `src/pipeline.py` ou o flow do Prefect | `data/staging/*.parquet` |
+| Conferir | `pytest` | Qualidade da staging e se ela é igual à silver |
+| Promover para silver | À mão: copiar os arquivos conferidos de `data/staging` para `data/silver` (ainda não tem script) | `data/silver/*.parquet` |
+| Analisar | Notebooks `05` e `06` | Leem só `data/silver` |
+| Montar as tabelas do painel | `python gerar_modelo_bi_girosus.py` | `data/gold/girosus/` |
 | Painel | Power BI, seguindo o guia do analista do PDF | Relatório GiroSUS |
 </details>
 
 <details>
-<summary>⚠️ O notebook 04 e a pasta data/silver</summary>
+<summary>⚙️ O que o pipeline faz com cada fonte</summary>
 
-O notebook `04` fez a primeira consolidação multianual e também grava em `data/silver`. Mas a silver atual é igual à saída do pipeline, e as duas não batem numa coluna: o `04` grava a data de internação do SIH (DT_INTER) como texto, enquanto o pipeline e a silver atual têm essa coluna como data.
+Cada fonte (SIH, CNES, IBGE) passa por três passos, cada um na sua pasta dentro de `src/`:
 
-Por isso, não rode a célula final do `04` (a que grava em `data/silver`) sem necessidade: ela sobrescreve a silver e faz o teste `test_sih_staging_igual_silver` falhar.
+1. **`extract/`**: lê os arquivos de `data/raw` e carrega numa tabela (DataFrame), sem mudar nada. No SIH e no CNES, lê os `.parquet` mensais dos anos definidos em `src/config.py` e anota o nome do arquivo de origem. No IBGE, lê as planilhas de população de cada ano.
+2. **`transform/`**: padroniza os dados:
+   * **SIH** (`transform/sih.py`): transforma a data de internação (DT_INTER) em data. O resto fica como veio.
+   * **CNES** (`transform/cnes.py`): tira o ano e o mês do nome do arquivo (`LTGO2401` vira 2024, mês 1) e transforma as quantidades de leitos (QT_EXIST, QT_SUS, QT_NSUS) em número.
+   * **População** (`transform/populacao.py`): padroniza os nomes das colunas de cada planilha, monta o código de município com 7 dígitos, limpa os valores (tira pontos e notas de rodapé), marca a origem de cada ano e calcula 2023 pela média entre 2022 e 2024.
+3. **Grava** o resultado em Parquet em `data/staging`.
+
+O pipeline **não** grava em `data/silver`. A silver só recebe a staging depois que os testes passam.
+</details>
+
+<details>
+<summary>📦 Por que Parquet e não CSV</summary>
+
+Parquet é um formato compacto e rápido de ler, e guarda o tipo de cada coluna junto com o arquivo. Assim ninguém precisa reconverter datas e números toda vez que abre os dados. O CSV só aparece nas tabelas pequenas do painel, para facilitar abrir no Excel.
 </details>
 
 <details>
 <summary>📁 Arquivos que não vêm no repositório</summary>
 
-Alguns arquivos estão no `.gitignore` e não aparecem num `git clone`:
+Estes itens estão no `.gitignore` e não aparecem num `git clone`:
 
-* `*.dbc`: arquivos originais do DATASUS. O repositório já traz a versão convertida em `.parquet`, que é o que o pipeline usa.
-* `data/raw/ibge/censo_2022/Pessoas_52_publico.csv`: microdados do Censo, grandes demais para o Git e não usados na base final.
-* `data/staging/`: gerada ao rodar o pipeline.
-* `docs/`: documentação de referência local.
-* `.venv/`: ambiente virtual de cada pessoa.
+* `*.dbc`: arquivos originais do DATASUS. O repositório já traz a versão em `.parquet`, que é a que o pipeline usa.
+* `data/raw/ibge/censo_2022/Pessoas_52_publico.csv`: microdados do Censo, grandes demais e fora da base final.
+* `data/staging/`: aparece quando você roda o pipeline.
+* `docs/`: documentação local (dicionário em CSV e PDF do código).
+* `.venv/`: o ambiente virtual de cada pessoa.
 </details>
 
-## Como funciona o negócio
+## Regras de negócio
 
 <details>
-<summary>🏥 O que é uma AIH e por que isso importa</summary>
+<summary>🏥 O que é uma AIH e quais entram na conta</summary>
 
-AIH é a Autorização de Internação Hospitalar, o documento que registra cada internação no SUS. Na contagem de novas internações, o projeto descarta as AIHs de longa permanência (campo IDENT igual a 5), porque elas representam a continuidade de um mesmo tratamento e inflariam os números. Na prática, sobram as AIHs regulares (IDENT igual a 1).
+AIH é a Autorização de Internação Hospitalar, o documento que registra cada internação no SUS. Existem dois tipos:
+
+* **IDENT = 1 (regular):** uma internação nova. É essa que entra na conta.
+* **IDENT = 5 (longa permanência):** continuação de uma internação que já existe. Fica de fora, porque contaria o mesmo paciente duas vezes.
 </details>
 
 <details>
-<summary>📅 Por que o recorte vai só até junho de 2026</summary>
+<summary>📅 Período: por que vai só até junho de 2026</summary>
 
-O projeto cobre janeiro de 2021 a junho de 2026. O ano de 2026 ainda está em andamento na base de dados, então ele entra apenas parcial. Comparações de sazonalidade e volume usam somente anos completos (2021 a 2025) para não distorcer o resultado.
+O projeto cobre janeiro de 2021 a junho de 2026. Como 2026 ainda está em andamento, ele entra parcial, e comparações de volume e sazonalidade usam só os anos completos (2021 a 2025).
 
-As bases não terminam no mesmo mês: o SIH vai até junho de 2026 e o CNES até julho de 2026. As análises cortam as internações pela data de internação, entre 01/01/2021 e 30/06/2026.
+As bases não terminam no mesmo mês: o SIH vai até junho de 2026 e o CNES até julho de 2026. Nas análises, as internações são cortadas pela data de internação, entre 01/01/2021 e 30/06/2026.
 </details>
 
 <details>
 <summary>📍 Recorte geográfico</summary>
 
-O projeto olha para o estado de Goiás (UF GO, código IBGE 52). As internações consideradas nos indicadores por população são apenas de pacientes residentes em municípios goianos.
+O foco é Goiás (UF GO, código IBGE 52). Nos indicadores por população (por exemplo, internações por 10 mil habitantes), entram só pacientes que moram em municípios goianos.
 </details>
 
 <details>
-<summary>🗓️ Por que existem várias bases de população com safras diferentes</summary>
+<summary>🩺 Grupos de doença</summary>
 
-Dentro de `data/raw/ibge` não existe uma única fonte de população cobrindo todos os anos, cada ano vem de uma publicação diferente do IBGE, então o projeto combina várias safras:
-
-* 2021: estimativa populacional anual publicada pelo IBGE (`estimativas/2021`).
-* 2022: população do Censo 2022, na versão republicada pelo IBGE para o TCU (`tcu_2023`), não a estimativa anual.
-* 2023: não existe fonte oficial do IBGE para esse ano. O valor usado é calculado pelo próprio projeto, pela média entre a população de 2022 e a de 2024 (interpolação), e fica marcado na base com origem "Cálculo próprio com dados IBGE".
-* 2024, 2025 e 2026: estimativas populacionais anuais publicadas pelo IBGE (`estimativas/2024`, `estimativas/2025`, `estimativas/2026`).
-
-Nem tudo que está em `data/raw/ibge` é usado pelo pipeline. Os microdados do Censo 2022 em `censo_2022/` (domicílios, famílias, mortalidade) e o arquivo de população por UF em `tcu_2023/POP_TCU_2023_Brasil_e_UFs...` foram baixados como referência, mas não entram na base final, só a planilha de população por município do TCU é usada.
-
-O CNES e o SIH não têm esse problema, ali é a mesma fonte mês a mês, todos os arquivos mensais de `data/raw/cnes` e `data/raw/sih` no período do projeto são lidos e usados.
+O GiroSUS agrupa as internações pela primeira letra do diagnóstico principal (DIAG_PRINC), que é o capítulo da CID-10. Exemplos: J = Respiratório, I = Circulatório, S e T = Lesões e traumas, D00 a D48 = Câncer, D50 a D89 = Sangue. A lista completa de grupos está na tabela `dim_diagnostico` do [Dicionário de dados](#dicionário-de-dados).
 </details>
 
 <details>
-<summary>🫁 Como uma doença respiratória é identificada</summary>
+<summary>🗓️ Por que a população vem de várias publicações do IBGE</summary>
 
-Uma internação é classificada como respiratória quando o diagnóstico principal (coluna DIAG_PRINC) começa com a letra J, que corresponde ao Capítulo X da CID 10, doenças do aparelho respiratório (J00 a J99).
+Não existe uma única fonte do IBGE com todos os anos, então o projeto junta várias:
+
+* **2021:** estimativa anual do IBGE (`estimativas/2021`).
+* **2022:** população do Censo 2022, na versão enviada ao TCU (`tcu_2023`).
+* **2023:** o IBGE não publicou. O projeto calcula a média entre 2022 e 2024 e marca a origem como "Cálculo próprio com dados IBGE".
+* **2024, 2025 e 2026:** estimativas anuais do IBGE (`estimativas/2024`, `2025`, `2026`).
+
+Nem tudo em `data/raw/ibge` é usado: os microdados do Censo em `censo_2022/` e o arquivo por UF em `tcu_2023/POP_TCU_2023_Brasil_e_UFs...` foram baixados só como referência.
+
+No SIH e no CNES não tem esse problema: é a mesma fonte mês a mês, e todos os arquivos do período são usados.
 </details>
 
 <details>
 <summary>📌 Onde essas regras são aplicadas</summary>
 
-As regras de negócio acima não ficam no pipeline. O `src/` apenas extrai e padroniza os dados, mantendo todas as AIHs. Os filtros são aplicados nos notebooks de análise:
+As regras **não** ficam no pipeline. O `src/` só lê e padroniza, mantendo todas as AIHs. As regras entram depois:
 
-* Exclusão das AIHs de longa permanência (IDENT igual a 5) e corte do período pela data de internação: notebooks `05` e `06`.
-* Recorte de pacientes residentes em Goiás: notebooks `05` e `06`, cruzando o município de residência (MUNIC_RES) com os códigos de município da base de população.
-* Classificação de doença respiratória (CID J): hoje é o grupo “Respiratório” do GiroSUS (capítulo J da CID-10). A análise respiratória antiga do notebook `06` continua no histórico do Git.
-* Regras do GiroSUS (safra por competência, grupo de doença, tempo típico, dias acima do típico): notebook `06` e `gerar_modelo_bi_girosus.py`, com a mesma lógica nos dois.
+* Tirar as AIHs de continuação (IDENT = 5), cortar o período e filtrar residentes em Goiás: notebooks `05` e `06`.
+* Regras do GiroSUS (safra, grupo de doença, tempo típico, dias acima do típico): notebook `06` e `gerar_modelo_bi_girosus.py`, com a mesma lógica nos dois.
 
-Quem for criar um indicador novo deve reaplicar os mesmos filtros para os números baterem com as análises existentes.
+Vai criar um indicador novo? Aplique os mesmos filtros, senão seus números não vão bater com os do projeto.
+</details>
+
+## Modelo do Power BI
+
+O script `gerar_modelo_bi_girosus.py` (veja [Como rodar o projeto](#como-rodar-o-projeto)) entrega 2 tabelas fato (os acontecimentos) e 6 dimensões (as “legendas” usadas nos filtros).
+
+<details>
+<summary>🗃️ As tabelas geradas</summary>
+
+| Arquivo | Cada linha é | Linhas |
+|---|---|---|
+| `fato_internacoes` | Uma internação (AIH regular), de todas as safras | 2,2 milhões |
+| `fato_ocupacao_diaria` | Um hospital, num dia, num grupo de doença (internados, entradas e altas) | 2,0 milhões |
+| `dim_tempo` | Um dia do calendário (2020 a 2026) | 2.557 |
+| `dim_diagnostico` | Um código CID-10, com o grupo de doença | 8.327 |
+| `dim_procedimento` | Um procedimento da tabela SIGTAP | 1.586 |
+| `dim_hospital` | Um hospital (CNES) | 303 |
+| `dim_municipio_residencia` e `dim_municipio_atendimento` | Um município (mesma tabela, uma para cada lado da relação) | 2.362 |
+
+* Todas saem em `.parquet`. `dim_diagnostico`, `dim_procedimento`, `dim_hospital` e `dim_municipio_residencia` também saem em `.csv`.
+* Em `dim_hospital.csv` e `dim_procedimento.csv`, as colunas `nome_hospital` e `nome_procedimento` vêm em branco, para preencher à mão pela consulta pública do CNES e pela tabela SIGTAP.
+* O valor da UTI (`VAL_UTI`) ainda não está na silver, então o script lê direto de `data/raw/sih`. Se esses arquivos não estiverem na máquina, só a coluna `valor_uti` fica vazia.
+* A `fato_internacoes.parquet` passa de 40 MB. Combinem no grupo se ela vai para o Git ou se cada pessoa gera a sua.
+
+O que é cada coluna: [Dicionário de dados › Tabelas do painel GiroSUS](#dicionário-de-dados).
 </details>
 
 <details>
-<summary>📈 O que as análises já responderam</summary>
+<summary>🔗 Relacionamentos e montagem no Power BI</summary>
 
-No produto GiroSUS (safra 2025, todas as causas, em leito-dia): 1,84 milhão de leitos-dia e R$ 726 milhões pagos; o respiratório é a 2ª causa que mais ocupa leito; internações de mais de 15 dias são 4,4% dos pacientes e 27,3% dos leitos; 43,9% dos leitos-dia ficam acima do tempo típico; Goiânia concentra 44,7% dos leitos-dia do estado. Detalhes na seção [O produto GiroSUS](#o-produto-girosus).
+Relacionamentos (todos 1 para muitos e ativos):
 
-Na análise respiratória anterior: internações respiratórias representam cerca de 9% do total de internações em Goiás, com pico entre abril e junho. Municípios menores têm taxa de internação por habitante mais alta que municípios grandes, mesmo tendo menos casos em número absoluto. Comparadas às demais internações, elas têm mortalidade mais que o dobro, tempo de internação maior e uso de UTI quase duas vezes mais frequente.
+* `dim_tempo[data]` → `fato_internacoes[data_internacao]` e `fato_ocupacao_diaria[data]`
+* `dim_hospital[cnes]` → `fato_internacoes[cnes]` e `fato_ocupacao_diaria[cnes]`
+* `dim_diagnostico[cid]` → `fato_internacoes[cid]`
+* `dim_procedimento[proc_rea]` → `fato_internacoes[proc_rea]`
+* `dim_municipio_residencia[codigo]` → `fato_internacoes[munic_residencia]`
+* `dim_municipio_atendimento[codigo]` → `fato_internacoes[munic_atendimento]`
+
+Depois de importar:
+
+* Marque `dim_tempo` como tabela de datas.
+* Classifique `nome_mes` por `mes`, `nome_dia` por `dia_semana` e `faixa_duracao` por `ordem_faixa`.
+* Filtre `fato_internacoes[safra] = 2025` nas páginas 1 a 6 e `dim_tempo[ano] = 2025` na página do calendário (a safra não filtra a tabela de ocupação).
+* Crie o parâmetro **Redução %** (de 0,05 a 0,30).
+
+As 22 medidas DAX e o mapa de cada gráfico (visual, colunas, medida e filtro) estão no PDF do produto, nas páginas 22 a 24.
 </details>
 
-## Como funcionam os notebooks
+## Dicionário de dados
+
+O dicionário é a “legenda” das nossas tabelas: para cada coluna, diz o que ela significa, de onde veio, que tipo de valor tem e um exemplo real. Ele está aqui embaixo para ler e também em [`docs/dicionário/dicionario_dados.csv`](docs/dicion%C3%A1rio/dicionario_dados.csv), para abrir no Excel e filtrar.
 
 <details>
-<summary>📓 Um notebook por etapa da análise</summary>
+<summary>📖 Para que serve (com exemplos)</summary>
 
-Os notebooks seguem uma ordem numerada, e cada um tem uma responsabilidade específica:
+Os arquivos do DATASUS vêm com nomes curtos e códigos que não dizem nada sozinhos. O dicionário traduz:
 
-* `01`, `02`, `03`: exploração de cada fonte isolada (SIH, CNES, IBGE), entendendo dimensão, tipos, nulos e duplicidades.
-* `04`: consolidação das bases em um único dataset multianual por fonte. Foi a primeira versão da consolidação que hoje o pipeline faz (veja [O notebook 04 e a pasta data/silver](#fluxo-dos-dados)).
-* `05`: análise integrada, cruzando as três fontes para responder a pergunta de negócio principal.
-* `06`: análise do produto GiroSUS. Calcula, na safra 2025, todos os números do material comercial e responde as 34 perguntas do painel em três níveis (o retrato, onde e quem, onde agir), além das curiosidades sobre como o SUS paga uma internação. Até a versão anterior, era o recorte de doenças respiratórias; esse conteúdo continua no histórico do Git.
+| Você vê na tabela | O que quer dizer |
+|---|---|
+| `VAL_TOT = 485.78` | Valor total pago pelo SUS pela internação, em R$ (não é o custo real do hospital) |
+| `MUNIC_MOV = 520870` | Município onde fica o hospital, em código IBGE de 6 dígitos (520870 = Goiânia) |
+| `CAR_INT = 02` | Internação de urgência (01 seria eletiva, ou seja, planejada) |
+| `IDENT = 5` | Continuação de uma internação que já existe (por isso fica fora das contagens) |
+
+Use sempre que for criar um indicador, montar um gráfico ou explicar um número numa apresentação.
+
+Ele cobre 93 colunas: SIH (23), CNES (12), IBGE (10) e as tabelas do painel (48), além do significado de cada código.
 </details>
 
 <details>
-<summary>🔁 Por que os notebooks de análise usam os dados de data/silver</summary>
+<summary>💡 Como ler e dicas para não errar</summary>
 
-Os notebooks de análise (`05` e `06`) leem sempre os arquivos Parquet já consolidados em `data/silver`, nunca os dados brutos diretamente. Isso garante que todo mundo do grupo está analisando a mesma versão validada dos dados, que é conferida pelos testes contra a saída do pipeline.
+* **Camada:** `silver` = bases tratadas (`data/silver`); `gold` = tabelas do painel (`data/gold/girosus`).
+* **Origem:** o campo do arquivo original do DATASUS (RD = internações do SIH; LT = leitos do CNES) ou a regra usada para criar a coluna.
+* **Número guardado como texto:** “texto (número)” quer dizer que é número, mas vem como texto. Converta antes de somar (em pandas: `pd.to_numeric(df["VAL_TOT"])`). As tabelas do GiroSUS já vêm convertidas.
+* **A idade depende de outra coluna:** `IDADE = 3` pode ser 3 anos, 3 meses ou 3 dias. Quem diz é `COD_IDADE`.
+* **Colunas que ainda não chegaram na silver:** `SEXO`, `IDADE`, `COD_IDADE` e `GESTAO` já saem do pipeline (estão em `data/staging`), mas só chegam em `data/silver` depois de promover a staging (veja [Como atualizar os dados](#como-atualizar-os-dados)).
+* **Mantenha em dia:** criou, renomeou ou removeu uma coluna? Atualize esta seção e o CSV na mesma branch da mudança.
 </details>
 
 <details>
-<summary>⚠️ Notebooks que dependem dos arquivos .dbc</summary>
+<summary>🏥 SIH, internações (silver)</summary>
 
-Os notebooks `01`, `02` e `04` foram escritos para ler os arquivos `.dbc` originais com o PySUS. Como os `.dbc` não vêm no repositório, esses notebooks não rodam num clone novo: eles não encontram os arquivos e param com erro. Os notebooks `03`, `05` e `06` rodam normalmente.
+Arquivo: `data/silver/sih_multianual.parquet` · 1 linha = 1 AIH (inclui as de continuação) · 2.286.755 registros, competências de jan/2021 a jun/2026, hospitais de Goiás.
 
-Para rodar `01`, `02` e `04` hoje é preciso ter os `.dbc` nas pastas `data/raw/sih/<ano>` e `data/raw/cnes/<ano>`. A alternativa, ainda pendente, é adaptar esses notebooks para ler os `.parquet` que já estão no repositório.
+| Coluna | Tipo | O que é | Origem / regra | Exemplo |
+|---|---|---|---|---|
+| `ANO_CMPT` | texto | Ano da competência: ano em que o hospital apresentou a AIH para pagamento | SIH (RD) | `2025` |
+| `MES_CMPT` | texto | Mês da competência, com 2 dígitos | SIH (RD) | `05` |
+| `N_AIH` | texto | Número da AIH. Identifica a internação, não a pessoa | SIH (RD) | `5220103703310` |
+| `IDENT` | texto | Tipo da AIH. Ver códigos | SIH (RD) | `1` |
+| `SEQ_AIH5` | texto | Sequencial da AIH de longa permanência. Em Goiás vem sempre 000 | SIH (RD) | `000` |
+| `CNES` | texto | Código do hospital no Cadastro Nacional de Estabelecimentos de Saúde (7 dígitos) | SIH (RD) | `6665322` |
+| `MUNIC_RES` | texto | Município onde o paciente mora (código IBGE de 6 dígitos, sem o dígito verificador) | SIH (RD) | `521930` |
+| `MUNIC_MOV` | texto | Município onde fica o hospital, 6 dígitos | SIH (RD) | `520870` |
+| `DT_INTER` | data | Data de entrada no hospital | SIH (RD); vira data em `src/transform/sih.py` | `2025-01-25` |
+| `DT_SAIDA` | texto | Data de saída (alta, transferência ou óbito), no formato AAAAMMDD | SIH (RD) | `20250204` |
+| `DIAS_PERM` | texto (número) | Dias de permanência. É o leito-dia da internação | SIH (RD) | `3` |
+| `UTI_MES_TO` | texto (número) | Total de dias em UTI. 0 = não usou UTI | SIH (RD) | `0` |
+| `VAL_TOT` | texto (número) | Valor total pago pelo SUS, em R$. Não é o custo real do hospital | SIH (RD) | `485.78` |
+| `DIAG_PRINC` | texto | Diagnóstico principal pela CID-10. A 1ª letra é o capítulo (J = respiratório, I = circulatório…) | SIH (RD) | `J189` |
+| `MORTE` | texto | Se o paciente morreu na internação. Ver códigos | SIH (RD) | `0` |
+| `ESPEC` | texto | Especialidade do leito. Ver códigos | SIH (RD) | `03` |
+| `PROC_REA` | texto | Procedimento realizado, pela tabela SIGTAP (10 dígitos). Define o valor pago | SIH (RD) | `0303140151` |
+| `CAR_INT` | texto | Caráter da internação (eletiva, urgência, acidente). Ver códigos | SIH (RD) | `02` |
+| `SEXO` | texto | Sexo do paciente. Ver códigos | SIH (RD) · entra na silver ao promover a staging | `3` |
+| `IDADE` | texto (número) | Idade, na unidade indicada por COD_IDADE | SIH (RD) · entra na silver ao promover a staging | `27` |
+| `COD_IDADE` | texto | Unidade da idade (dias, meses, anos). Ver códigos | SIH (RD) · entra na silver ao promover a staging | `4` |
+| `GESTAO` | texto | Tipo de gestão do hospital. Ver códigos | SIH (RD) · entra na silver ao promover a staging | `1` |
+| `ARQUIVO_ORIGEM` | texto | Arquivo mensal do DATASUS de onde veio a linha (RDGO + AAMM) | Criada em `src/extract/sih.py` | `RDGO2505.dbc` |
 </details>
 
-## Como funcionam os testes
+<details>
+<summary>🛏️ CNES, leitos (silver)</summary>
+
+Arquivo: `data/silver/cnes_multianual.parquet` · 1 linha = 1 tipo de leito de 1 estabelecimento em 1 mês · 198.448 registros, jan/2021 a jul/2026.
+
+| Coluna | Tipo | O que é | Origem / regra | Exemplo |
+|---|---|---|---|---|
+| `CNES` | texto | Código do estabelecimento (7 dígitos) | CNES (LT) | `9331603` |
+| `CODUFMUN` | texto | Município do estabelecimento (código IBGE de 6 dígitos) | CNES (LT) | `520010` |
+| `TP_UNID` | texto | Tipo de unidade (hospital geral, especializado, unidade mista…). Ver códigos | CNES (LT) | `05` |
+| `TP_LEITO` | texto | Grande tipo de leito (cirúrgico, clínico, UTI…). Ver códigos | CNES (LT) | `2` |
+| `CODLEITO` | texto | Tipo detalhado do leito (ex.: 33 clínica geral, 75 UTI adulto tipo II) | CNES (LT) | `33` |
+| `QT_EXIST` | número | Leitos existentes daquele tipo | CNES (LT); vira número em `src/transform/cnes.py` | `9` |
+| `QT_SUS` | número | Desses, quantos atendem o SUS | CNES (LT); vira número | `9` |
+| `QT_NSUS` | número | Leitos não SUS (planos e particulares) | CNES (LT); vira número | `0` |
+| `COMPETEN` | texto | Mês de referência, no formato AAAAMM | CNES (LT) | `202101` |
+| `ARQUIVO_ORIGEM` | texto | Arquivo mensal de origem (LTGO + AAMM) | Criada em `src/extract/cnes.py` | `LTGO2101.dbc` |
+| `ANO` | número | Ano da competência, tirado do nome do arquivo | Criada em `src/transform/cnes.py` | `2021` |
+| `MES` | número | Mês da competência, tirado do nome do arquivo | Criada em `src/transform/cnes.py` | `1` |
+</details>
 
 <details>
-<summary>✅ O que os testes garantem</summary>
+<summary>👥 IBGE, população (silver)</summary>
 
-Os testes ficam em `tests/` e rodam com pytest. Eles verificam:
+Arquivo: `data/silver/populacao_multianual.parquet` · 1 linha = 1 município em 1 ano · 33.422 registros, todos os municípios do Brasil, 2021 a 2026.
 
-* Colunas críticas sem valores nulos (por exemplo, data de internação, código do município, CNES).
-* Ausência de duplicidade em chaves (por exemplo, código do município mais ano na base de população).
-* Cobertura temporal completa, conferindo se todos os meses do período esperado estão presentes.
-* Formato válido dos códigos de município (7 dígitos no IBGE, 6 dígitos no SIH).
-* Igualdade entre o dado gerado em staging e o dado final validado em silver.
+| Coluna | Tipo | O que é | Origem / regra | Exemplo |
+|---|---|---|---|---|
+| `uf` | texto | Sigla do estado | IBGE | `GO` |
+| `cod_uf` | texto | Código do estado (2 dígitos). Goiás = 52 | IBGE | `52` |
+| `cod_municipio` | texto | Parte do código do município dentro do estado (5 dígitos) | IBGE | `08707` |
+| `municipio` | texto | Nome do município | IBGE | `Goiânia` |
+| `populacao` | número inteiro | População no ano de referência | IBGE; limpa em `src/transform/populacao.py` | `1503256` |
+| `codigo_ibge_7` | texto | Código IBGE completo (7 dígitos). Os 6 primeiros batem com o SIH e o CNES | cod_uf + cod_municipio | `5208707` |
+| `ano_referencia` | número | Ano a que a população se refere (2021 a 2026) | Criada em `src/transform/populacao.py` | `2025` |
+| `ano_publicacao` | número | Ano em que o IBGE publicou. Vazio em 2023 (valor calculado pelo projeto) | Criada em `src/transform/populacao.py` | `2025` |
+| `origem` | texto | IBGE ou “Cálculo próprio com dados IBGE” (2023) | Criada em `src/transform/populacao.py` | `IBGE` |
+| `tipo_dado` | texto | Tipo da fonte: estimativa anual, Censo 2022 (TCU) ou interpolação 2022–2024 | Criada em `src/transform/populacao.py` | `Estimativa populacional` |
+</details>
+
+<details>
+<summary>📊 Tabelas do painel GiroSUS (gold)</summary>
+
+Todas em `data/gold/girosus/`. Regras: só AIH regular (IDENT = 1), safra = ano da competência (padrão do painel: 2025), todas as causas de internação.
+
+#### fato_internacoes
+
+| Coluna | Tipo | O que é | Origem / regra | Exemplo |
+|---|---|---|---|---|
+| `chave_aih` | texto | Número da internação | N_AIH | `5225100458160` |
+| `safra` | número | Ano da competência. Filtro principal do painel (2025) | ANO_CMPT | `2025` |
+| `competencia` | data | 1º dia do mês da competência | ANO_CMPT + MES_CMPT | `2025-02-01` |
+| `data_internacao` | data | Data de entrada | DT_INTER | `2025-01-25` |
+| `data_saida` | data | Data de saída | DT_SAIDA | `2025-02-04` |
+| `cnes` | texto | Hospital (7 dígitos) | CNES | `0965324` |
+| `munic_residencia` | texto | Município onde o paciente mora | MUNIC_RES | `522140` |
+| `munic_atendimento` | texto | Município do hospital | MUNIC_MOV | `520870` |
+| `cid` | texto | Diagnóstico principal | DIAG_PRINC | `J181` |
+| `proc_rea` | texto | Procedimento realizado | PROC_REA | `0303140151` |
+| `leito_dias` | número | Dias de internação = leitos-dia | DIAS_PERM | `10` |
+| `tempo_tipico` | número | Mediana de dias do mesmo procedimento na mesma safra | mediana(DIAS_PERM) por safra e PROC_REA | `4` |
+| `dias_acima_tipico` | número | Dias além do tempo típico (0 se ficou menos) | max(0, leito_dias − tempo_tipico) | `6` |
+| `faixa_duracao` | texto | Faixa de duração: 0 dia, 1–3, 4–7, 8–15, 16–30, > 30 | leito_dias | `8–15` |
+| `ordem_faixa` | número | Ordem da faixa (1 a 6), só para classificar no Power BI | faixa_duracao | `4` |
+| `fl_fora_municipio` | número (0/1) | 1 = internado fora do município onde mora | MUNIC_RES ≠ MUNIC_MOV | `1` |
+| `fl_uti` | número (0/1) | 1 = passou pela UTI | UTI_MES_TO > 0 | `0` |
+| `dias_uti` | número | Dias de UTI | UTI_MES_TO | `0` |
+| `valor_pago` | número (R$) | Valor pago pelo SUS (não é o custo real do hospital) | VAL_TOT | `753.34` |
+| `valor_uti` | número (R$) | Parte do valor paga pela UTI. Vazio se os arquivos brutos não estiverem na máquina | VAL_UTI (`data/raw/sih`) | `0.00` |
+
+#### fato_ocupacao_diaria
+
+| Coluna | Tipo | O que é | Origem / regra | Exemplo |
+|---|---|---|---|---|
+| `cnes` | texto | Hospital | CNES | `7743068` |
+| `data` | data | Dia (01/01/2021 a 30/06/2026) | calendário | `2025-05-20` |
+| `grupo_doenca` | texto | Grupo de doença (capítulo da CID-10) | DIAG_PRINC | `Respiratório` |
+| `pacientes_internados` | número | Pacientes internados no dia: entrou até o dia e saiu depois dele | DT_INTER, DT_SAIDA | `422` |
+| `entradas` | número | Internações que começaram no dia | DT_INTER | `94` |
+| `altas` | número | Saídas no dia | DT_SAIDA | `88` |
+
+#### dim_tempo
+
+| Coluna | Tipo | O que é | Origem / regra | Exemplo |
+|---|---|---|---|---|
+| `data` | data | Dia do calendário (2020 a 2026) | gerado pelo script | `2025-05-20` |
+| `ano / mes / trimestre` | número | Ano, mês e trimestre da data | data | `2025 / 5 / 2` |
+| `nome_mes` | texto | Mês abreviado (jan…dez). Classificar por `mes` | data | `mai` |
+| `ano_mes` | texto | AAAA-MM | data | `2025-05` |
+| `dia_semana` | número | 1 = segunda … 7 = domingo | data | `2` |
+| `nome_dia` | texto | seg…dom. Classificar por `dia_semana` | data | `ter` |
+| `fl_fim_semana` | número (0/1) | 1 = sábado ou domingo | data | `0` |
+
+#### dim_diagnostico
+
+| Coluna | Tipo | O que é | Origem / regra | Exemplo |
+|---|---|---|---|---|
+| `cid` | texto | Código CID-10 | DIAG_PRINC | `J189` |
+| `capitulo` | texto | 1ª letra do CID | DIAG_PRINC | `J` |
+| `grupo_doenca` | texto | Grupo: Lesões e traumas, Respiratório, Circulatório, Infecciosas, Digestivo, Gravidez e parto, Câncer, Saúde mental… | capítulo da CID-10 (D00–D48 = Câncer; D50–D89 = Sangue; S e T = Lesões e traumas) | `Respiratório` |
+
+#### dim_procedimento
+
+| Coluna | Tipo | O que é | Origem / regra | Exemplo |
+|---|---|---|---|---|
+| `proc_rea` | texto | Código do procedimento SIGTAP | PROC_REA | `0303140151` |
+| `diagnostico_mais_comum` | texto | CID que mais aparece com esse procedimento | DIAG_PRINC | `J189` |
+| `tempo_tipico_2025` | número | Mediana de dias do procedimento na safra 2025 | DIAS_PERM | `4` |
+| `nome_procedimento` | texto | Nome oficial. Vem em branco: preencher pela tabela SIGTAP | manual | `Tratamento de pneumonias ou influenza (gripe)` |
+
+#### dim_hospital
+
+| Coluna | Tipo | O que é | Origem / regra | Exemplo |
+|---|---|---|---|---|
+| `cnes` | texto | Código do hospital | CNES | `0965324` |
+| `municipio_atendimento` | texto | Município do hospital (o mais frequente para aquele CNES) | MUNIC_MOV | `520870` |
+| `nome_municipio` | texto | Nome do município | tabela do IBGE | `Goiânia` |
+| `nome_hospital` | texto | Nome do hospital. Vem em branco: preencher pela consulta pública do CNES | manual | — |
+
+#### dim_municipio_residencia / dim_municipio_atendimento
+
+| Coluna | Tipo | O que é | Origem / regra | Exemplo |
+|---|---|---|---|---|
+| `codigo` | texto | Código do município (6 dígitos) | MUNIC_RES / MUNIC_MOV | `522140` |
+| `nome` | texto | Nome do município | tabela do IBGE | `Trindade` |
+| `uf` | texto | Estado | tabela do IBGE | `GO` |
+| `fl_goias` | número (0/1) | 1 = município de Goiás (código começa com 52) | codigo | `1` |
+</details>
+
+<details>
+<summary>🔢 Códigos: o que significa cada valor</summary>
+
+| Campo | Códigos | Observação |
+|---|---|---|
+| `IDENT` (SIH) | 1 = AIH regular (internação nova) · 5 = longa permanência (continuação da mesma internação) | 2.235.030 regulares e 51.725 de continuação |
+| `MORTE` (SIH) | 0 = não morreu · 1 = óbito na internação | 93.489 óbitos (4,1% dos registros) |
+| `CAR_INT` (SIH) | 01 = eletiva (planejada) · 02 = urgência · 05 = outros acidentes de trânsito · 06 = outras lesões e envenenamentos | Quase tudo é 02 (79%) ou 01 (21%) |
+| `ESPEC` (SIH) | 01 = cirúrgico · 02 = obstétrico · 03 = clínico · 04 = crônico · 05 = psiquiatria · 06 = pneumologia sanitária (tisiologia) · 07 = pediátrico · 08 = reabilitação · 09 = leito-dia cirúrgico | Os códigos 10, 12, 14, 17 e 87 somam menos de 0,3%: conferir no informe técnico do SIH |
+| `SEXO` (SIH) | 1 = masculino · 3 = feminino | Há 2 registros com código 4 (fora do padrão; tratar como ignorado) |
+| `COD_IDADE` (SIH) | 2 = dias · 3 = meses · 4 = anos · 5 = 100 anos ou mais (IDADE conta a partir de 100) | Menores de 1 ano vêm em dias ou meses |
+| `GESTAO` (SIH) | 1 e 2 = tipo de gestão do hospital (estadual ou municipal) | Conferir no informe técnico do SIH qual é qual antes de usar |
+| `TP_LEITO` (CNES) | 1 = cirúrgico · 2 = clínico · 3 = complementar (UTI e UCI) · 4 = obstétrico · 5 = pediátrico · 6 = outras especialidades · 7 = hospital-dia | |
+| `TP_UNID` (CNES) | 05 = hospital geral · 07 = hospital especializado · 15 = unidade mista · 20 = pronto-socorro geral · 21 = pronto-socorro especializado · 36 = clínica/centro de especialidade · 61 = centro de parto normal · 62 = hospital-dia · 69 = centro de hemoterapia · 70 = CAPS · 73 = pronto atendimento · 77 = atenção domiciliar | 05 e 07 somam 95% dos registros |
+| `CODLEITO` (CNES) | Tipo detalhado do leito. Exemplos: 33 = clínica geral · 75 = UTI adulto tipo II · 78 = UTI pediátrica tipo II · 81 = UTI neonatal tipo II | Lista completa na tabela de tipos de leito do CNES |
+
+Os códigos marcados como “conferir” ainda não foram confirmados na documentação oficial. Na dúvida, confira no informe técnico do DATASUS antes de usar.
+</details>
+
+## Notebooks
+
+<details>
+<summary>📓 O que cada notebook faz</summary>
+
+Eles seguem uma ordem numerada, e cada um tem um papel:
+
+* **`01`, `02`, `03`:** exploração de cada fonte sozinha (SIH, CNES, IBGE): tamanho, tipos, valores vazios e duplicados.
+* **`04`:** primeira versão da consolidação multianual, que hoje o pipeline faz.
+* **`05`:** análise integrada, cruzando as três fontes para responder a pergunta de negócio principal.
+* **`06`:** análise do GiroSUS. Calcula, na safra 2025, todos os números do material do produto e responde as 34 perguntas do painel em três níveis (o retrato, onde e quem, onde agir), além das curiosidades sobre como o SUS paga uma internação.
+
+Os notebooks de análise (`05` e `06`) leem sempre `data/silver`, nunca os dados brutos. Assim todo mundo analisa a mesma versão conferida.
+</details>
+
+<details>
+<summary>⚠️ Cuidados: notebooks 01, 02 e 04</summary>
+
+* **Precisam dos `.dbc`:** `01`, `02` e `04` leem os arquivos `.dbc` originais com o PySUS. Como eles não vêm no repositório, esses notebooks param com erro num clone novo. Para rodar, coloque os `.dbc` em `data/raw/sih/<ano>` e `data/raw/cnes/<ano>`. Os notebooks `03`, `05` e `06` rodam normalmente.
+* **O `04` sobrescreve a silver:** a última célula do `04` grava em `data/silver`, mas salva a data de internação (DT_INTER) como texto, enquanto o pipeline salva como data. Não rode essa célula sem necessidade: ela bagunça a silver e faz o teste `test_sih_staging_igual_silver` falhar.
+</details>
+
+## Testes
+
+<details>
+<summary>✅ O que os testes conferem</summary>
+
+Os testes ficam em `tests/` e rodam com `pytest`. São 15 no total, e eles conferem:
+
+* Colunas importantes sem valores vazios (data de internação, código do município, CNES).
+* Nada duplicado nas chaves (por exemplo, município + ano na população).
+* Todos os meses do período presentes.
+* Códigos de município no formato certo (7 dígitos no IBGE, 6 no SIH).
+* Se a staging é igual à silver (`test_staging_silver.py`).
 </details>
 
 <details>
 <summary>▶️ Como rodar os testes</summary>
 
-Os testes leem os arquivos de `data/staging`, que não vêm no repositório. Num clone novo, rode o pipeline antes:
+Os testes leem `data/staging`, que não vem no repositório. Então, num clone novo, rode o pipeline antes:
 
 ```bash
 python -m src.pipeline
 pytest
 ```
 
-Sem esse primeiro passo, os testes falham com erro de arquivo não encontrado.
-</details>
-
-## Como funciona o pipeline
-
-<details>
-<summary>⚙️ As três etapas por fonte de dado</summary>
-
-Cada fonte (SIH, CNES, IBGE) passa por três etapas, cada uma em sua própria pasta dentro de `src/`:
-
-1. `extract/`: lê os arquivos de `data/raw` e carrega em DataFrame, sem transformar nada. No SIH e no CNES, lê os `.parquet` mensais do período definido em `src/config.py` e guarda o nome do arquivo de origem. No IBGE, lê as planilhas de população de cada ano.
-2. `transform/`: padroniza os dados de cada fonte.
-3. O resultado é salvo em Parquet em `data/staging`.
-
-O pipeline não grava em `data/silver`. Depois de validada pelos testes, a staging é copiada à mão para `data/silver`. Os testes conferem se as duas são iguais.
-</details>
-
-<details>
-<summary>🧹 O que cada transformação faz</summary>
-
-* **SIH** (`transform/sih.py`): converte a data de internação (DT_INTER) para data. As demais colunas ficam como vieram.
-* **CNES** (`transform/cnes.py`): extrai o ano e o mês da competência a partir do nome do arquivo (por exemplo, `LTGO2401` vira 2024, mês 1) e converte as quantidades de leitos (QT_EXIST, QT_SUS, QT_NSUS) para número.
-* **População** (`transform/populacao.py`): padroniza os nomes das colunas de cada planilha do IBGE, monta o código de município com 7 dígitos, limpa os valores de população (remove pontos e notas de rodapé), marca a origem de cada ano e calcula 2023 pela média entre 2022 e 2024.
-</details>
-
-<details>
-<summary>▶️ Como rodar o pipeline inteiro</summary>
-
-De forma simples, com um script sequencial:
-
-```bash
-python -m src.pipeline
-```
-
-Ou orquestrado com Prefect, que também é responsável por rodar tudo com um único comando:
-
-```bash
-python -m src.orchestration.prefect_flow
-```
-
-O flow do Prefect roda localmente, sem precisar subir um servidor do Prefect antes. Ele executa as mesmas funções do `src/pipeline.py`, organizadas como tarefas.
-</details>
-
-<details>
-<summary>📦 Por que Parquet em vez de CSV</summary>
-
-Parquet é um formato colunar, mais compacto e mais rápido de ler que CSV, e mantém o tipo de cada coluna salvo junto com o arquivo. Isso evita ter que reconverter tipos toda vez que alguém abre os dados tratados.
+* O `python -m src.pipeline` **não mostra nada na tela**, e isso é normal. Para saber se funcionou, veja se os 3 arquivos em `data/staging` foram criados ou atualizados.
+* Se só os testes de `test_staging_silver.py` falharem, é porque a staging nova tem colunas que a silver ainda não tem. Promova a staging (veja [Como atualizar os dados](#como-atualizar-os-dados), passo 5) e rode o `pytest` de novo.
 </details>
 
 ## Como atualizar os dados
@@ -442,18 +597,22 @@ Parquet é um formato colunar, mais compacto e mais rápido de ler que CSV, e ma
 <details>
 <summary>📆 Incluir um mês novo do SIH ou do CNES</summary>
 
-1. Baixe o arquivo do mês no [DATASUS](https://datasus.saude.gov.br/transferencia-de-arquivos/): `RDGOAAMM.dbc` para o SIH e `LTGOAAMM.dbc` para o CNES (AA é o ano com dois dígitos e MM o mês).
-2. Converta o `.dbc` para `.parquet`, mantendo o mesmo nome, e salve na pasta do ano: `data/raw/sih/<ano>/` ou `data/raw/cnes/<ano>/`. Todas as colunas devem ficar como texto, igual aos arquivos que já estão no repositório.
-3. Atualize os testes de cobertura temporal (`tests/test_sih.py` e `tests/test_cnes.py`), que conferem a quantidade de meses e o último mês esperado.
-4. Rode o pipeline e os testes de qualidade da staging:
+1. Baixe o arquivo do mês no [DATASUS](https://datasus.saude.gov.br/transferencia-de-arquivos/): `RDGOAAMM.dbc` para o SIH e `LTGOAAMM.dbc` para o CNES (AA = ano com dois dígitos, MM = mês).
+2. Converta o `.dbc` para `.parquet`, com o mesmo nome, e salve na pasta do ano: `data/raw/sih/<ano>/` ou `data/raw/cnes/<ano>/`. Todas as colunas como texto, igual aos arquivos que já estão lá.
+3. Atualize os testes de período (`tests/test_sih.py` e `tests/test_cnes.py`), que conferem quantos meses existem e qual é o último.
+4. Rode o pipeline e os testes de qualidade:
    ```bash
    python -m src.pipeline
    pytest tests/test_sih.py tests/test_cnes.py tests/test_populacao.py
    ```
-5. Se passarem, copie os três arquivos de `data/staging` para `data/silver` e rode todos os testes:
+5. Se passarem, promova a staging para a silver e rode todos os testes:
    ```bash
    cp data/staging/*.parquet data/silver/
    pytest
+   ```
+6. Gere de novo as tabelas do painel:
+   ```bash
+   python gerar_modelo_bi_girosus.py
    ```
 </details>
 
@@ -463,24 +622,40 @@ Parquet é um formato colunar, mais compacto e mais rápido de ler que CSV, e ma
 Além dos passos acima:
 
 * Ajuste `ANO_FINAL` em `src/config.py`.
-* Inclua a planilha de população do ano em `data/raw/ibge/estimativas/<ano>/` e registre o arquivo e o nome da aba em `ARQUIVOS_IBGE`, no `src/extract/ibge.py`.
-* Atualize o teste de cobertura da população (`tests/test_populacao.py`).
+* Coloque a planilha de população do ano em `data/raw/ibge/estimativas/<ano>/` e registre o arquivo e o nome da aba em `ARQUIVOS_IBGE`, no `src/extract/ibge.py`.
+* Atualize o teste de período da população (`tests/test_populacao.py`).
 </details>
 
 ## Solução de problemas
 
 <details>
-<summary>⏳ Notebook fica carregando e não executa as células no VS Code</summary>
+<summary>❌ O ambiente não instala ou dá erro</summary>
 
-A versão 7 do `ipykernel` tem um problema conhecido com a extensão Jupyter do VS Code que faz as células ficarem travadas ([issue #17228](https://github.com/microsoft/vscode-jupyter/issues/17228)). Por isso o `requirements.txt` fixa `ipykernel<7`.
+1. Apague a pasta `.venv` manualmente.
+2. Confira a versão do Python (precisa ser 3.12.x):
+   ```bash
+   python --version
+   ```
+3. Refaça o ambiente:
+   ```bash
+   py -3.12 -m venv .venv
+   source .venv/Scripts/activate
+   pip install -r requirements.txt
+   ```
+</details>
 
-Se o problema aparecer, confira a versão instalada:
+<details>
+<summary>⏳ O notebook fica carregando e não roda as células no VS Code</summary>
+
+A versão 7 do `ipykernel` tem um problema conhecido com a extensão Jupyter do VS Code que trava as células ([issue #17228](https://github.com/microsoft/vscode-jupyter/issues/17228)). Por isso o `requirements.txt` fixa `ipykernel<7`.
+
+Confira a versão instalada:
 
 ```bash
 pip show ipykernel
 ```
 
-Se for 7.x, instale a versão 6 e recarregue o VS Code (`Ctrl+Shift+P` e depois `Developer: Reload Window`):
+Se for 7.x, instale a 6 e recarregue o VS Code (`Ctrl+Shift+P` e depois `Developer: Reload Window`):
 
 ```bash
 pip install "ipykernel<7"
@@ -490,19 +665,19 @@ pip install "ipykernel<7"
 <details>
 <summary>🧩 O VS Code pede para escolher ou instalar um kernel</summary>
 
-Clique no nome do kernel no canto superior direito do notebook, escolha "Select Another Kernel", depois "Python Environments", e selecione o `.venv` do projeto (Python 3.12). Confira se o `.venv` está ativo e se as dependências foram instaladas com `pip install -r requirements.txt`.
+Clique no nome do kernel no canto superior direito do notebook, escolha "Select Another Kernel", depois "Python Environments", e selecione o `.venv` do projeto (Python 3.12). Confira também se o `.venv` está ativo e se você rodou `pip install -r requirements.txt`.
 </details>
 
 <details>
-<summary>❌ Os testes falham com arquivo não encontrado</summary>
+<summary>❌ Os testes falham com “arquivo não encontrado”</summary>
 
-Os testes leem `data/staging`, que é gerada pelo pipeline. Rode `python -m src.pipeline` antes do `pytest`.
+Os testes leem `data/staging`, que só existe depois de rodar o pipeline. Rode `python -m src.pipeline` antes do `pytest`.
 </details>
 
 <details>
 <summary>❌ Os notebooks 01, 02 ou 04 dão erro logo no começo</summary>
 
-Esses notebooks procuram os arquivos `.dbc`, que não vêm no repositório. Veja [Notebooks que dependem dos arquivos .dbc](#como-funcionam-os-notebooks).
+Eles procuram os arquivos `.dbc`, que não vêm no repositório. Veja [Cuidados: notebooks 01, 02 e 04](#notebooks).
 </details>
 
 ## Como contribuir
@@ -518,7 +693,7 @@ Esses notebooks procuram os arquivos `.dbc`, que não vêm no repositório. Veja
    ```
    Exemplos de nome: `fix/config`, `docs/readme`, `feat/analise-idade`.
 2. Antes de commitar, confira o que mudou com `git status`.
-3. Não suba a pasta `.venv/`, os arquivos de `data/staging/` nem os `.dbc`. Eles já estão no `.gitignore`.
+3. Não suba `.venv/`, `data/staging/` nem os `.dbc` (já estão no `.gitignore`).
 4. Envie a branch e abra um pull request para a `main`:
    ```bash
    git push -u origin nome-da-branch
@@ -526,15 +701,15 @@ Esses notebooks procuram os arquivos `.dbc`, que não vêm no repositório. Veja
 </details>
 
 <details>
-<summary>📓 Cuidados com os notebooks</summary>
+<summary>📓 Cuidados com os notebooks no Git</summary>
 
-Ao rodar um notebook, o VS Code grava os resultados e a numeração das execuções dentro do arquivo `.ipynb`, e o Git passa a mostrar o notebook como modificado. Se você só rodou o notebook, sem mudar o código, descarte essas alterações antes de commitar:
+Quando você roda um notebook, o VS Code grava os resultados dentro do `.ipynb`, e o Git passa a mostrar o arquivo como modificado. Se você só rodou, sem mudar o código, descarte essas alterações antes de commitar:
 
 ```bash
 git restore notebooks/
 ```
 
-Esse comando desfaz todas as alterações não commitadas nos notebooks. Se você editou algum de propósito, restaure só os outros, informando o nome de cada arquivo.
+Atenção: esse comando desfaz **todas** as alterações não commitadas nos notebooks. Se você editou algum de propósito, restaure só os outros, informando o nome de cada arquivo.
 </details>
 
 ## Perguntas frequentes
@@ -542,95 +717,79 @@ Esse comando desfaz todas as alterações não commitadas nos notebooks. Se voc�
 <details>
 <summary>🐍 Qual linguagem e quais bibliotecas o projeto usa</summary>
 
-Python 3.12, com pandas para manipulação de dados, pyarrow para ler e escrever Parquet, openpyxl e xlrd para ler planilhas do IBGE, prefect para orquestração do pipeline, pytest para os testes e ipykernel para rodar os notebooks. O PySUS é usado para ler os arquivos `.dbc` do DATASUS nos notebooks `01`, `02` e `04`. O duckdb está no `requirements.txt`, mas hoje não é usado no código nem nos notebooks.
+| Biblioteca | Para quê |
+|---|---|
+| Python 3.12 | A linguagem do projeto |
+| pandas | Manipular as tabelas |
+| pyarrow | Ler e gravar Parquet |
+| openpyxl e xlrd | Ler as planilhas do IBGE |
+| prefect | Organizar (orquestrar) o pipeline |
+| pytest | Rodar os testes |
+| ipykernel | Rodar os notebooks no VS Code |
+| PySUS | Ler os `.dbc` do DATASUS (notebooks `01`, `02` e `04`) |
+| duckdb | Está no `requirements.txt`, mas hoje não é usado |
 </details>
 
 <details>
-<summary>🗂️ Existe um dicionário de dados</summary>
+<summary>🔄 Dá para refazer tudo do zero</summary>
 
-Sim, em [`dicionario_dados/`](dicionario_dados/README.md). Ele descreve todas as colunas das bases de `data/silver` (SIH, CNES e população) e das tabelas do painel GiroSUS em `data/gold/girosus`: tipo, significado, origem e exemplo, além do que significa cada código (IDENT, MORTE, CAR_INT, ESPEC, SEXO, tipos de leito etc.). A mesma informação está em `dicionario_dados.csv`, para abrir no Excel.
+Em parte. A partir de `data/raw`, tudo é automático: qualquer pessoa roda `python -m src.pipeline` (ou `python -m src.orchestration.prefect_flow`, que faz o mesmo organizado com Prefect e roda local, sem servidor) e recria a staging. Duas etapas ainda são manuais: baixar e converter os `.dbc` para `.parquet`, e copiar a staging conferida para `data/silver`.
 </details>
 
-<details>
-<summary>🔄 O pipeline é repetível do zero</summary>
-
-Em parte. A partir de `data/raw`, a extração e a transformação são scriptadas, então qualquer pessoa do grupo pode rodar `python -m src.pipeline` (ou o flow do Prefect) e reproduzir a staging do início. Duas etapas ainda não são automáticas: o download e a conversão dos `.dbc` para `.parquet`, e a cópia da staging validada para `data/silver`.
-</details>
-
-<details>
-<summary>🚧 O que ainda não existe neste projeto</summary>
-
-A idade e o sexo do paciente ainda não estão na base silver, então hoje não é possível segmentar as análises por faixa etária, por exemplo crianças ou idosos. O mesmo vale para o valor da UTI (`VAL_UTI`), que o `gerar_modelo_bi_girosus.py` lê direto dos arquivos brutos.
-</details>
-
-## Referências e benchmarks
-
-* **SUS 360º**
-  Estrutura por módulos, KPIs, leitos, capacidade e mapas.
-  [Acessar SUS 360º](https://sus360.saude.gov.br/)
-
-* **ElastiCNES**
-  Referência para mapas, tipos de leitos e filtros geográficos.
-  [Acessar ElastiCNES](https://elasticnes.saude.gov.br/)
-
-* **Internações Hospitalares, São Paulo**
-  Referência para dimensões, filtros e perguntas possíveis utilizando dados de internações hospitalares.
-  [Acessar Internações Hospitalares](https://prefeitura.sp.gov.br/web/saude/tabnet/internacoes_hospitalares)
-
-* **Painel e-SUS APS**
-  Referência de experiência do usuário (UX) e organização de informações para gestão em saúde.
-  [Acessar e-SUS APS](https://sisaps.saude.gov.br/sistemas/esusaps/)
-
-* **Observatório de Saúde Infantil**
-  Projeto no GitHub que utiliza dados do SIM e SIH para análise de mortalidade e internações de crianças de 0 a 6 anos.
-  [Acessar repositório](https://github.com/fmdsocial/sim-sih-mortalidade-internacoes-0-6-anos)
-
-* **SUS Data Analysis**
-  Repositório com análises utilizando dados públicos do SUS.
-  [Acessar repositório](https://github.com/claudioavgo/sus-data-analysis)
-
-## Datasets utilizados
+## Bases de dados e fontes
 
 <details>
 <summary>🏥 SIH/SUS, Internações Hospitalares (AIH)</summary>
 
-**O que é:** base de dados de internações hospitalares do SUS contendo informações como procedimentos, diagnósticos, datas de internação e saída, município de residência, município de atendimento e valores registrados nas AIHs.
+**O que é:** a base de internações do SUS, com procedimentos, diagnósticos, datas de entrada e saída, município do paciente e do hospital e valores pagos.
 
-**Fonte:** [DATASUS, Transferência de Arquivos](https://datasus.saude.gov.br/transferencia-de-arquivos/)
+**Arquivos usados:** AIH Reduzida (RD).
 
-**Base utilizada:** SIH/SUS, arquivos de AIH Reduzida (RD).
+**Fonte:** [DATASUS, Transferência de Arquivos](https://datasus.saude.gov.br/transferencia-de-arquivos/), com o informe técnico do sistema.
 </details>
 
 <details>
 <summary>🛏️ CNES, Estabelecimentos e Leitos</summary>
 
-**O que é:** Cadastro Nacional de Estabelecimentos de Saúde, utilizado para obter informações sobre estabelecimentos, tipos de leitos e capacidade hospitalar instalada.
+**O que é:** o Cadastro Nacional de Estabelecimentos de Saúde, usado para saber os tipos de leito e a capacidade instalada de cada estabelecimento.
 
-**Fonte:** [DATASUS, Transferência de Arquivos](https://datasus.saude.gov.br/transferencia-de-arquivos/)
+**Arquivos usados:** Leitos (LT).
 
-**Base utilizada:** CNES, arquivos de Leitos (LT).
+**Fonte:** [DATASUS, Transferência de Arquivos](https://datasus.saude.gov.br/transferencia-de-arquivos/), com o informe técnico do sistema.
 </details>
 
 <details>
 <summary>👥 IBGE, População Municipal</summary>
 
-**Uso no projeto:** os dados populacionais são utilizados como referência para contextualização e normalização de indicadores, como internações por 10 mil habitantes.
+**Para que serve no projeto:** dar nome aos municípios e calcular indicadores por habitante, como internações por 10 mil habitantes.
 
-**Estimativas da População:** estimativas anuais da população dos municípios brasileiros.
-[Acessar Estimativas da População](https://ftp.ibge.gov.br/Estimativas_de_Populacao/)
-
-**Censo Demográfico 2022, População e Domicílios:** resultados do Censo Demográfico 2022 relacionados à população e aos domicílios.
-[Acessar Censo Demográfico 2022](https://ftp.ibge.gov.br/Censos/Censo_Demografico_2022/Populacao_e_domicilios_Primeiros_resultados/)
-
-**População dos Municípios enviada ao TCU, 2023:** arquivos publicados pelo IBGE para divulgação da população dos municípios ao Tribunal de Contas da União (TCU).
-[Acessar arquivos do TCU](https://ftp.ibge.gov.br/Informacoes_Gerais_e_Referencia/Relacao_da_Populacao_dos_Municipios_para_publicacao_no_DOU_em_2023/)
+* **Estimativas da População:** estimativas anuais por município. [Acessar](https://ftp.ibge.gov.br/Estimativas_de_Populacao/)
+* **Censo Demográfico 2022, População e Domicílios:** [Acessar](https://ftp.ibge.gov.br/Censos/Censo_Demografico_2022/Populacao_e_domicilios_Primeiros_resultados/)
+* **População dos Municípios enviada ao TCU, 2023:** [Acessar](https://ftp.ibge.gov.br/Informacoes_Gerais_e_Referencia/Relacao_da_Populacao_dos_Municipios_para_publicacao_no_DOU_em_2023/)
 </details>
+
+<details>
+<summary>📚 Tabelas de apoio</summary>
+
+* **Procedimentos e valores:** tabela SIGTAP do SUS.
+* **Diagnósticos:** Classificação Internacional de Doenças, 10ª revisão (CID-10).
+</details>
+
+## Referências e benchmarks
+
+* **SUS 360º:** estrutura por módulos, KPIs, leitos, capacidade e mapas. [Acessar](https://sus360.saude.gov.br/)
+* **ElastiCNES:** mapas, tipos de leitos e filtros geográficos. [Acessar](https://elasticnes.saude.gov.br/)
+* **Internações Hospitalares, São Paulo:** dimensões, filtros e perguntas possíveis com dados de internação. [Acessar](https://prefeitura.sp.gov.br/web/saude/tabnet/internacoes_hospitalares)
+* **Painel e-SUS APS:** experiência do usuário e organização de informações para gestão em saúde. [Acessar](https://sisaps.saude.gov.br/sistemas/esusaps/)
+* **Observatório de Saúde Infantil:** projeto no GitHub com dados do SIM e do SIH sobre mortalidade e internações de crianças de 0 a 6 anos. [Acessar](https://github.com/fmdsocial/sim-sih-mortalidade-internacoes-0-6-anos)
+* **SUS Data Analysis:** repositório com análises de dados públicos do SUS. [Acessar](https://github.com/claudioavgo/sus-data-analysis)
 
 ## O que ainda falta
 
 * 🖥️ Construir o relatório `.pbix` do GiroSUS no Power BI, seguindo o guia do analista do PDF.
 * 🏷️ Preencher os nomes dos hospitais (`dim_hospital.csv`) e dos procedimentos (`dim_procedimento.csv`).
 * 📏 Trocar o tempo típico (mediana do SIH) pela permanência média oficial da tabela SIGTAP.
+* 👤 Levar idade, sexo e valor da UTI para a silver, para poder separar as análises por faixa etária (crianças, idosos) sem ler os arquivos brutos.
 * 🔄 Script para baixar os `.dbc` do DATASUS e converter para `.parquet`.
 * 📓 Adaptar os notebooks `01`, `02` e `04` para lerem os `.parquet` de `data/raw`, sem depender dos `.dbc`.
-* ⚙️ Etapa automática que copie a staging validada para `data/silver`.
+* ⚙️ Etapa automática que copie a staging conferida para `data/silver`.
