@@ -5,8 +5,7 @@
 # Todos os CSVs (tabelas do painel, planilhas do IBGE etc.)
 *.csv
 # ...menos o dicionário de dados, que é pequeno e é documentação
-!docs/dicionário/dicionario_dados.csv
-
+!docs/dicionário/GiroSUS_dicionario_dados.csv
 # Arquivos originais do DATASUS
 *.dbc
 *.dbf

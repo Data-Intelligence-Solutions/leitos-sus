@@ -10,7 +10,7 @@ O produto final é o **GiroSUS**: um painel no Power BI que mostra **quem ocupa 
 >
 > **Usamos uma ferramenta de leito?** Não. O GiroSUS não usa censo hospitalar, sistema de regulação nem cadastro de leitos. Ele mede o uso do leito a partir das internações pagas pelo SUS. O CNES (leitos cadastrados) só foi usado na exploração.
 
-> **Em 30 segundos:** os dados do SUS entram em `data/raw`, o código limpa e organiza, os testes conferem, o script `gerar_modelo_bi_girosus.py` monta as tabelas do painel e o Power BI mostra o resultado. O material completo do produto (pitch, gráficos, perguntas, guia do analista e método) está em [`dashboard/GiroSUS_painel_ocupacao_leitos.pdf`](dashboard/GiroSUS_painel_ocupacao_leitos.pdf).
+> **Em 30 segundos:** os dados do SUS entram em `data/raw`, o código limpa e organiza, os testes conferem, o script `gerar_modelo_bi_girosus.py` monta as tabelas do painel e o Power BI mostra o resultado. O material do produto fica em `docs/`: o painel página por página em [`docs/bi/GiroSUS_modelagem_bi.pdf`](docs/bi/GiroSUS_modelagem_bi.pdf), as medidas DAX em [`docs/bi/GiroSUS_modelagem_dax.pdf`](docs/bi/GiroSUS_modelagem_dax.pdf) e o pitch em [`docs/apresentacao/GiroSUS_pitch.pdf`](docs/apresentacao/GiroSUS_pitch.pdf).
 
 ## Sumário
 
@@ -119,14 +119,13 @@ Ele mede o atraso da cobrança, refaz as estimativas de 2025 "voltando no tempo"
 
 | Material | Onde está | Para quem |
 |---|---|---|
-| Material do produto: pitch, 7 páginas do painel com gráficos, 34 perguntas, perguntas de cliente e banca, guia do analista e método | `dashboard/GiroSUS_painel_ocupacao_leitos.pdf` | Clientes, analistas e avaliadores |
+| Pitch curto do produto, em 2 páginas | `docs/apresentacao/GiroSUS_pitch.pdf` | Clientes, quem apresenta e avaliadores |
 | Análise com todos os números do GiroSUS | `notebooks/06_girosus_ocupacao_leitos.ipynb` | Analistas |
 | Tabelas que o Power BI importa (10 arquivos `.csv`) | geradas por `gerar_modelo_bi_girosus.py` em `data/gold/girosus/` | Analista de BI |
-| O que significa cada coluna | seção [Dicionário de dados](#dicionário-de-dados) e `docs/dicionário/dicionario_dados.csv` | Todo mundo |
-| Como o código funciona, pasta por pasta, e a lista de todos os tratamentos feitos nos dados | `docs/code/como_funciona.pdf` | Quem vai mexer no código |
-| Material de negócio do painel (perguntas, gráficos e regras) | `docs/bi/modelagem_bi.pdf` | Quem apresenta e o cliente |
-| Todas as medidas DAX, por página e pergunta | `docs/bi/modelagem_dax.pdf` | Analista de BI |
-| Apresentação (PowerPoint) e pitch curto em PDF | `docs/apresentacao/` | Quem apresenta e quem assistiu |
+| O que significa cada coluna | seção [Dicionário de dados](#dicionário-de-dados) e `docs/dicionário/GiroSUS_dicionario_dados.csv` | Todo mundo |
+| Como o código funciona, pasta por pasta, e a lista de todos os tratamentos feitos nos dados | `docs/code/GiroSUS_como_funciona.pdf` | Quem vai mexer no código |
+| Material de negócio do painel: cada gráfico, a pergunta que responde (P7 a P40), as regras e a defasagem | `docs/bi/GiroSUS_modelagem_bi.pdf` | Quem apresenta e o cliente |
+| Todas as medidas DAX, por página e pergunta | `docs/bi/GiroSUS_modelagem_dax.pdf` | Analista de BI |
 | Teste da estimativa dos meses incompletos (defasagem) | `testar_estimativa_defasagem.py` | Quem precisa provar os números da defasagem |
 </details>
 
@@ -135,17 +134,17 @@ Ele mede o atraso da cobrança, refaz as estimativas de 2025 "voltando no tempo"
 
 ```
 leitos-sus/
-├── 📊 dashboard/                  # Material do produto GiroSUS (PDF)
+├── 📊 dashboard/                  # Pasta reservada (hoje vazia; o material do produto está em docs/)
 ├── 🗂️ data/
 │   ├── raw/                        # Dados originais: SIH (base do produto); CNES e IBGE (exploração e apoio)
 │   ├── staging/                    # O que o pipeline gera (fica só na sua máquina, não vai para o Git)
 │   ├── silver/                     # Bases conferidas pelos testes; é daqui que as análises leem
 │   └── gold/girosus/               # Tabelas do Power BI em CSV (geradas na sua máquina, fora do Git)
 ├── 📖 docs/
-│   ├── apresentacao/               # Apresentação (.pptx) e pitch curto (.pdf)
-│   ├── bi/                         # modelagem_bi.pdf (negócio) e modelagem_dax.pdf (medidas DAX)
-│   ├── dicionário/                 # dicionario_dados.csv: o dicionário em planilha
-│   └── code/                       # como_funciona.pdf: explicação do código e lista dos tratamentos
+│   ├── apresentacao/               # GiroSUS_pitch.pdf: o pitch curto
+│   ├── bi/                         # GiroSUS_modelagem_bi.pdf (negócio) e GiroSUS_modelagem_dax.pdf (medidas DAX)
+│   ├── dicionário/                 # GiroSUS_dicionario_dados.csv: o dicionário em planilha
+│   └── code/                       # GiroSUS_como_funciona.pdf: explicação do código e lista dos tratamentos
 ├── 📓 notebooks/                   # Exploração e análises (06_girosus_ocupacao_leitos = GiroSUS)
 ├── 🐍 src/
 │   ├── config.py                   # Caminhos e parâmetros (anos, estado) num lugar só
@@ -197,7 +196,7 @@ O que acontece: o script lê `data/silver`, aplica as regras do GiroSUS e grava 
 
 Os CSVs usam o padrão brasileiro: separador `;` e decimal `,` (por exemplo, `485,78`). O Excel e o Power BI em português abrem direto. Feche esses arquivos no Excel antes de rodar, senão o script não consegue regravar e avisa.
 
-No final, ele confere se os 8 CSVs existem com todas as colunas e imprime a conferência da safra 2025. Esses números precisam bater com o PDF e com o notebook 06: **457.403 internações, 1.835.227 leitos-dia, R$ 726,1 milhões e 43,9% dos leitos-dia acima do típico**.
+No final, ele confere se os 10 CSVs existem com todas as colunas e imprime a conferência da safra 2025. Esses números precisam bater com o `docs/bi/GiroSUS_modelagem_bi.pdf` e com o notebook 06: **457.403 internações, 1.835.227 leitos-dia, R$ 726,1 milhões e 43,9% dos leitos-dia acima do típico**.
 
 Rode de novo sempre que `data/silver` for atualizada.
 </details>
@@ -254,7 +253,7 @@ IBGE (.xls/.xlsx) ───────────▶  data/raw/ibge
 | Conferir e promover para silver | `python -m src.promover_silver`: roda os testes de qualidade e, só se passarem, copia a staging para a silver e confere se ficaram iguais | `data/silver/*.parquet` |
 | Analisar | Notebooks `05` e `06` | Leem só `data/silver` |
 | Montar as tabelas do painel | `python gerar_modelo_bi_girosus.py` | `data/gold/girosus/*.csv` |
-| Painel | Power BI, seguindo o guia do analista do PDF | Relatório GiroSUS |
+| Painel | Power BI, seguindo `docs/bi/GiroSUS_modelagem_bi.pdf` (gráficos) e `docs/bi/GiroSUS_modelagem_dax.pdf` (medidas) | Relatório GiroSUS |
 </details>
 
 <details>
@@ -292,7 +291,7 @@ Estes itens estão no `.gitignore` e não aparecem num `git clone`:
 * `data/gold/girosus/`: as tabelas do painel. O CSV da fato passa de 250 MB, acima do limite do GitHub (100 MB); cada pessoa gera o seu com o script.
 * `.venv/`: o ambiente virtual de cada pessoa.
 
-A pasta `docs/` (dicionário em CSV e PDF do código) **vai** para o Git.
+A pasta `docs/` (dicionário em CSV e os PDFs) **vai** para o Git.
 </details>
 
 ## Regras de negócio
@@ -354,7 +353,7 @@ Vai criar um indicador novo? Aplique os mesmos filtros, senão seus números nã
 
 ## Modelo do Power BI
 
-O script `gerar_modelo_bi_girosus.py` (veja [Como rodar o projeto](#como-rodar-o-projeto)) entrega 2 tabelas fato (os acontecimentos), 6 dimensões (as “legendas” usadas nos filtros) e 1 tabela de apoio de sazonalidade, sem relacionamento.
+O script `gerar_modelo_bi_girosus.py` (veja [Como rodar o projeto](#como-rodar-o-projeto)) entrega 2 tabelas fato (os acontecimentos), 6 dimensões (as “legendas” usadas nos filtros) e 2 tabelas de apoio (sazonalidade e tendência), sem relacionamento.
 
 <details>
 <summary>🗃️ As tabelas geradas</summary>
@@ -372,9 +371,9 @@ O script `gerar_modelo_bi_girosus.py` (veja [Como rodar o projeto](#como-rodar-o
 | `tendencia_anual` | Um ano (2022 a 2025) com a média de pacientes internados por dia (tabela de apoio, sem relacionamento; a tendência da P29) | 4 |
 
 * Todas saem em `.csv` (separador `;`, decimal `,`).
-* **Importação pronta:** o script também grava `data/gold/girosus/power_query/<tabela>.pq`, uma consulta por tabela. Ela já lê o `;` e o decimal `,` (pt-BR) e já deixa `cnes`, `proc_rea`, `cid`, `codigo`, `munic_residencia` e `munic_atendimento` como **Texto**, sem perder o zero da frente (`0965324` não vira `965324`). No Power BI: Obter dados > Consulta nula > Editor avançado, cole o conteúdo do `.pq` e renomeie a consulta com o nome da tabela. Repita para as 8 tabelas.
+* **Importação pronta:** o script também grava `data/gold/girosus/power_query/<tabela>.pq`, uma consulta por tabela. Ela já lê o `;` e o decimal `,` (pt-BR) e já deixa `cnes`, `proc_rea`, `cid`, `codigo`, `munic_residencia` e `munic_atendimento` como **Texto**, sem perder o zero da frente (`0965324` não vira `965324`). No Power BI: Obter dados > Consulta nula > Editor avançado, cole o conteúdo do `.pq` e renomeie a consulta com o nome da tabela. Repita para as 10 tabelas.
 * O caminho do `.csv` dentro do `.pq` é o da pasta onde o script rodou. Se o projeto mudar de pasta, rode o script de novo (ou ajuste a linha `Arquivo`).
-* **Tudo olha só para a safra 2025**, como o PDF. A ocupação diária usa também as AIHs cobradas em 2024 e 2026 para contar quem estava internado nos dias de 2025, e depois fica só com os dias de 2025.
+* **Tudo olha só para a safra 2025**, como o `GiroSUS_modelagem_bi.pdf`. A ocupação diária usa também as AIHs cobradas em 2024 e 2026 para contar quem estava internado nos dias de 2025, e depois fica só com os dias de 2025.
 * O script para com ERRO se qualquer célula de qualquer tabela vier vazia.
 * Em `dim_procedimento.csv`, `nome_procedimento` traz 8 nomes definidos no script. Os demais vêm como `Procedimento <código>`, porque nenhuma base local (SIH, CNES, IBGE) tem o nome do procedimento. Se você trocar à mão pelo nome da tabela SIGTAP, o script preserva na próxima execução.
 * O SIH não tem o nome do hospital. O hospital vem da coluna `CNES` do SIH (código do Cadastro Nacional de Estabelecimentos de Saúde, 7 dígitos), e os arquivos de leitos do CNES do projeto (`LTGO*`) também não têm o nome. Por isso `dim_hospital.csv` identifica o hospital pelo `cnes` e pelo município e **não tem** `nome_hospital` (a coluna sairia vazia; o script para com erro se ela aparecer).
@@ -402,12 +401,12 @@ Depois de importar:
 * Filtre `fato_internacoes[safra] = 2025` nas páginas 1 a 6 e `dim_tempo[ano] = 2025` na página do calendário (a safra não filtra a tabela de ocupação).
 * Crie o parâmetro **Redução %** (de 0,05 a 0,30).
 
-As 22 medidas DAX e o mapa de cada gráfico (visual, colunas, medida e filtro) estão no PDF do produto, nas páginas 22 a 24.
+Todas as medidas DAX, organizadas pela página e pela pergunta, com o resultado esperado de cada uma, estão em `docs/bi/GiroSUS_modelagem_dax.pdf`. O gráfico de cada página está em `docs/bi/GiroSUS_modelagem_bi.pdf`.
 </details>
 
 ## Dicionário de dados
 
-O dicionário é a “legenda” das nossas tabelas: para cada coluna, diz o que ela significa, de onde veio, que tipo de valor tem e um exemplo real. Ele está aqui embaixo para ler e também em [`docs/dicionário/dicionario_dados.csv`](docs/dicion%C3%A1rio/dicionario_dados.csv), para abrir no Excel e filtrar.
+O dicionário é a “legenda” das nossas tabelas: para cada coluna, diz o que ela significa, de onde veio, que tipo de valor tem e um exemplo real. Ele está aqui embaixo para ler e também em [`docs/dicionário/GiroSUS_dicionario_dados.csv`](docs/dicion%C3%A1rio/GiroSUS_dicionario_dados.csv), para abrir no Excel e filtrar.
 
 <details>
 <summary>📖 Para que serve (com exemplos)</summary>
@@ -598,7 +597,7 @@ Todas em `data/gold/girosus/`. Regras: só AIH regular (IDENT = 1), safra = ano 
 
 #### sazonalidade_mensal
 
-Tabela de apoio, sem relacionamento. Alimenta o mapa de calor da página 11 do PDF (sazonalidade). No Power BI: visual Matriz com `grupo_doenca` nas linhas, `nome_mes` nas colunas e `variacao_pct` com formatação condicional. Não some `internados_dia` entre grupos e o total.
+Tabela de apoio, sem relacionamento. Alimenta o mapa de calor da página 17 do `GiroSUS_modelagem_bi.pdf` (sazonalidade). No Power BI: visual Matriz com `grupo_doenca` nas linhas, `nome_mes` nas colunas e `variacao_pct` com formatação condicional. Não some `internados_dia` entre grupos e o total.
 
 | Coluna | Tipo | O que é | Origem / regra | Exemplo |
 |---|---|---|---|---|
@@ -993,17 +992,16 @@ O que já existe e o que falta. Legenda: ✅ pronto · ❌ falta.
 <summary>📖 Documentação</summary>
 
 * ✅ **README** (este arquivo), com o [Dicionário de dados](#dicionário-de-dados).
-* ✅ **Dicionário em planilha**: `docs/dicionário/dicionario_dados.csv`.
-* ✅ **PDF do produto**: `dashboard/GiroSUS_painel_ocupacao_leitos.pdf` (pitch, 34 perguntas e guia do analista).
-* ✅ **PDF do código**: `docs/code/como_funciona.pdf` (metodologia, pasta por pasta, e a lista dos tratamentos).
-* ✅ **PDFs do painel**: `docs/bi/modelagem_bi.pdf` (negócio: pergunta, gráfico e regra) e `docs/bi/modelagem_dax.pdf` (medidas DAX).
-* ✅ **Apresentação e pitch**: `docs/apresentacao/GiroSUS_apresentacao.pptx` e `docs/apresentacao/GiroSUS_pitch.pdf`.
+* ✅ **Dicionário em planilha**: `docs/dicionário/GiroSUS_dicionario_dados.csv`.
+* ✅ **PDF do código**: `docs/code/GiroSUS_como_funciona.pdf` (metodologia, pasta por pasta, e a lista dos tratamentos).
+* ✅ **PDFs do painel**: `docs/bi/GiroSUS_modelagem_bi.pdf` (negócio: pergunta, gráfico e regra) e `docs/bi/GiroSUS_modelagem_dax.pdf` (medidas DAX).
+* ✅ **Pitch**: `docs/apresentacao/GiroSUS_pitch.pdf`.
 </details>
 
 <details>
 <summary>📊 Produto (Power BI)</summary>
 
-* ✅ **Modelo desenhado**: 2 fatos, 6 dimensões, 22 medidas DAX e o parâmetro "Redução %" (no PDF do produto).
+* ✅ **Modelo desenhado**: 2 fatos, 6 dimensões, 2 tabelas de apoio, as medidas DAX e o parâmetro "Redução %" (em `docs/bi/GiroSUS_modelagem_dax.pdf`).
 * ❌ **Arquivo `.pbix`** montado.
 * ❌ **Painel publicado**, com link, no Power BI Service.
 * ✅ **Campos vazios corrigidos** (`dim_hospital` e `dim_procedimento`): `nome_hospital` foi removido (o SIH não traz o nome do hospital) e todo procedimento tem nome ou o rótulo `Procedimento <código>`. O script para com ERRO se qualquer célula vier vazia.
