@@ -59,11 +59,16 @@ GiroSUS · fato_internacoes,data/gold/girosus/fato_internacoes.csv,gold,tempo_ti
 GiroSUS · fato_internacoes,data/gold/girosus/fato_internacoes.csv,gold,dias_acima_tipico,número,Dias além do tempo típico (0 se ficou menos),"max(0, leito_dias − tempo_tipico)",6
 GiroSUS · fato_internacoes,data/gold/girosus/fato_internacoes.csv,gold,faixa_duracao,texto,"Faixa de duração: 0 dia, 1–3, 4–7, 8–15, 16–30, > 30",a partir de leito_dias,8–15
 GiroSUS · fato_internacoes,data/gold/girosus/fato_internacoes.csv,gold,ordem_faixa,número,"Ordem da faixa (1 a 6), só para classificar no Power BI",a partir de faixa_duracao,4
+GiroSUS · fato_internacoes,data/gold/girosus/fato_internacoes.csv,gold,faixa_pagamento,texto,"Faixa de dias do gráfico de pagamento da pneumonia: 1–2 dias (inclui 0 dia), 3–4 dias, 5–7 dias, 8–14 dias, 15+ dias",a partir de leito_dias,8–14 dias
+GiroSUS · fato_internacoes,data/gold/girosus/fato_internacoes.csv,gold,ordem_faixa_pagamento,número,"Ordem da faixa de pagamento (1 a 5), só para classificar no Power BI",a partir de faixa_pagamento,4
+GiroSUS · fato_internacoes,data/gold/girosus/fato_internacoes.csv,gold,fl_permanencia_longa,número (0/1),1 = internação de mais de 15 dias,leito_dias > 15,0
 GiroSUS · fato_internacoes,data/gold/girosus/fato_internacoes.csv,gold,fl_fora_municipio,número (0/1),1 = internado fora do município onde mora,MUNIC_RES ≠ MUNIC_MOV,1
 GiroSUS · fato_internacoes,data/gold/girosus/fato_internacoes.csv,gold,fl_uti,número (0/1),1 = passou pela UTI,UTI_MES_TO > 0,0
 GiroSUS · fato_internacoes,data/gold/girosus/fato_internacoes.csv,gold,dias_uti,número,Dias de UTI,UTI_MES_TO,0
 GiroSUS · fato_internacoes,data/gold/girosus/fato_internacoes.csv,gold,valor_pago,número (R$),Valor pago pelo SUS,VAL_TOT,753.34
 GiroSUS · fato_internacoes,data/gold/girosus/fato_internacoes.csv,gold,valor_uti,número (R$),"Parte do valor paga pela UTI. Sem os arquivos brutos, o script para com erro",VAL_UTI (data/raw/sih),0.00
+GiroSUS · fato_internacoes,data/gold/girosus/fato_internacoes.csv,gold,diarias_acompanhante,número,"Diárias de acompanhante pagas na internação. Sem os arquivos brutos, o script para com erro",DIAR_ACOM (data/raw/sih),10
+GiroSUS · fato_internacoes,data/gold/girosus/fato_internacoes.csv,gold,fl_acompanhante,número (0/1),1 = teve diária de acompanhante paga,diarias_acompanhante > 0,1
 GiroSUS · fato_ocupacao_diaria,data/gold/girosus/fato_ocupacao_diaria.csv,gold,cnes,texto,Hospital,CNES,7743068
 GiroSUS · fato_ocupacao_diaria,data/gold/girosus/fato_ocupacao_diaria.csv,gold,data,data,Dia de 2025 (01/01/2025 a 31/12/2025),calendário,2025-05-20
 GiroSUS · fato_ocupacao_diaria,data/gold/girosus/fato_ocupacao_diaria.csv,gold,grupo_doenca,texto,Grupo de doença (capítulo da CID-10),DIAG_PRINC,Respiratório
@@ -71,7 +76,8 @@ GiroSUS · fato_ocupacao_diaria,data/gold/girosus/fato_ocupacao_diaria.csv,gold,
 GiroSUS · fato_ocupacao_diaria,data/gold/girosus/fato_ocupacao_diaria.csv,gold,entradas,número,Internações que começaram no dia,DT_INTER,94
 GiroSUS · fato_ocupacao_diaria,data/gold/girosus/fato_ocupacao_diaria.csv,gold,altas,número,Saídas no dia,DT_SAIDA,88
 GiroSUS · dim_tempo,data/gold/girosus/dim_tempo.csv,gold,data,data,Dia do calendário (17/05/2024 a 31/12/2025),gerado pelo script,2025-05-20
-GiroSUS · dim_tempo,data/gold/girosus/dim_tempo.csv,gold,ano / mes / trimestre,número,"Ano, mês e trimestre da data",data,2025 / 5 / 2
+GiroSUS · dim_tempo,data/gold/girosus/dim_tempo.csv,gold,ano,número,Ano da data,data,2025
+GiroSUS · dim_tempo,data/gold/girosus/dim_tempo.csv,gold,mes,número,Mês da data (1 a 12),data,5
 GiroSUS · dim_tempo,data/gold/girosus/dim_tempo.csv,gold,nome_mes,texto,Mês abreviado (jan…dez). Classificar por mes,data,mai
 GiroSUS · dim_tempo,data/gold/girosus/dim_tempo.csv,gold,ano_mes,texto,AAAA-MM,data,2025-05
 GiroSUS · dim_tempo,data/gold/girosus/dim_tempo.csv,gold,dia_semana,número,1 = segunda … 7 = domingo,data,2

@@ -1,10 +1,10 @@
-# GiroSus - /leitos-sus
+# GiroSUS · leitos-sus
 
-Projeto de análise da demanda hospitalar em Goiás com dados públicos do SUS. A ideia é entender onde e como as internações apertam a rede de saúde.
+**GiroSUS** é um produto de dados para gestores do SUS em Goiás: um painel de Power BI para **planejamento** da ocupação de leitos, feito com o dado oficial das internações (SIH/SUS). Este repositório (`leitos-sus`) guarda tudo o que sustenta o produto: o código que trata os dados, as tabelas do painel, os testes e a documentação.
 
 > **Base do produto: só o SIH/SUS.** Todos os números do GiroSUS vêm do SIH/SUS (Sistema de Informações Hospitalares), inclusive o código do hospital, que é a coluna `CNES` do próprio SIH. O IBGE entra só para mostrar o nome dos municípios e não muda nenhum número. O CNES e a população do IBGE foram usados só na exploração (notebooks `02`, `03` e `05`), fora do painel. Veja [Por que só o SIH](#o-produto-girosus).
 
-O produto final é o **GiroSUS**: um painel no Power BI que mostra **quem ocupa os leitos do SUS em Goiás, por quanto tempo e quanto isso custa**. Ele olha todas as causas de internação e mede tudo em **leito-dia** (um paciente ocupando um leito por um dia).
+O GiroSUS mostra **quem ocupa os leitos do SUS em Goiás, por quanto tempo e quanto isso custa**. Ele olha todas as causas de internação e mede tudo em **leito-dia** (um paciente ocupando um leito por um dia).
 
 > **O que é o GiroSUS, em uma frase:** GiroSUS é um painel de Power BI para **planejamento** da ocupação de leitos do SUS em Goiás, feito com dado oficial e mensal das internações (SIH/SUS). **Não é uma ferramenta de gestão de leitos em tempo real.**
 >
@@ -94,16 +94,16 @@ Antes do GiroSUS, o projeto fez uma análise só de doenças respiratórias (con
 
 O SIH chega com 1 a 2 meses de atraso: o hospital apresenta a conta (AIH) no mês da alta ou nos meses seguintes. O GiroSUS lida com isso em quatro camadas:
 
-1. **Transparência:** o painel mostra a data de corte e marca cada mês como *fechado*, *em consolidação* ou *estimado*. O gestor sempre sabe o que já está completo.
-2. **Decisão baseada em mês fechado:** os números principais, como os leitos presos além do típico e o simulador, usam a safra fechada. A defasagem não muda a decisão, só atrasa o mês mais recente.
-3. **Estimativa dos meses incompletos:** o atraso da cobrança é estável (65% das internações chegam no mesmo mês da alta e 99% em até 3 meses). Por isso dá para completar os meses recentes. Testado com 2025: no mês mais recente, erro de 8,4%, contra 29% olhando só o que chegou; um mês antes, erro de 2,7%. Isso aparece como "estimado", com faixa de erro.
-4. **Atualização mensal:** todo mês o estimado vira real, e o painel mostra quanto errou (o placar de acerto). Opção de piloto: o hospital contratante pode mandar os dados dele do mês corrente, para ver o "agora" dele mesmo.
+1. **Transparência** (próxima etapa): o painel vai mostrar a data de corte e marcar cada mês como *fechado*, *em consolidação* ou *estimado*. Assim o gestor sempre sabe o que já está completo.
+2. **Decisão baseada em mês fechado** (já no painel): os números principais, como os leitos presos além do típico e o simulador, usam a safra fechada. A defasagem não muda a decisão, só atrasa o mês mais recente.
+3. **Estimativa dos meses incompletos** (testada com dado real): o atraso da cobrança é estável (65% das internações chegam no mesmo mês da alta e 99% em até 3 meses). Por isso dá para completar os meses recentes. Testado com 2025: no mês mais recente, erro de 8,4%, contra 29% olhando só o que chegou; um mês antes, erro de 2,7%. Entra no painel como "estimado", com faixa de erro.
+4. **Atualização mensal** (próxima etapa): todo mês o estimado vai virar real, e o painel vai mostrar quanto errou (o placar de acerto). Opção de piloto: o hospital contratante pode mandar os dados dele do mês corrente, para ver o "agora" dele mesmo.
 
 **Gestão de custo com a defasagem.** Regra: **custo estimado do mês = leitos-dia estimados × R$ por leito-dia dos últimos 3 meses fechados, calculado por grupo de doença.** Por grupo e com meses recentes porque o R$ por leito-dia é estável, mas não é fixo: em 2025 variou entre R$ 361 e R$ 427 por mês e subiu no segundo semestre. Uma média do ano inteiro puxaria o valor para trás. Testado com 2025: erro de 4,8% no mês mais recente (contra 32,2% olhando só o que chegou) e de 4,0% um mês antes.
 
 **Onde terei leito disponível?** O GiroSUS não diz onde há leito livre hoje. Ele mostra **quando e onde a pressão é menor**: dezembro e janeiro são os meses mais vazios (−4,9% e −3,4% da média do ano), o fim de semana tem menos entradas (cerca de 940 por dia, contra 1.435 na terça) e há hospitais e municípios com menos dias acima do típico. Para ir além, dá para cruzar com o CNES (leitos SUS cadastrados) e estimar a taxa de ocupação por hospital, com um aviso: leito cadastrado não é leito em operação.
 
-**Situação hoje:** o painel usa a safra 2025 completa, com todos os meses fechados. A estimativa dos meses incompletos e do custo já foi testada; a marcação por mês e o placar de acerto entram quando o painel passar a ser atualizado todo mês. Para repetir o teste:
+**Situação hoje:** o painel usa a safra 2025 completa, com todos os meses fechados. A estimativa dos meses incompletos e do custo já foi testada com os dados de 2025 e entra no painel com a atualização mensal, junto com a marcação de cada mês e o placar de acerto. Para repetir o teste:
 
 ```bash
 python testar_estimativa_defasagem.py
@@ -532,11 +532,16 @@ Todas em `data/gold/girosus/`. Regras: só AIH regular (IDENT = 1), safra = ano 
 | `dias_acima_tipico` | número | Dias além do tempo típico (0 se ficou menos) | max(0, leito_dias − tempo_tipico) | `6` |
 | `faixa_duracao` | texto | Faixa de duração: 0 dia, 1–3, 4–7, 8–15, 16–30, > 30 | leito_dias | `8–15` |
 | `ordem_faixa` | número | Ordem da faixa (1 a 6), só para classificar no Power BI | faixa_duracao | `4` |
+| `faixa_pagamento` | texto | Faixa de dias do gráfico de pagamento da pneumonia: 1–2 dias (inclui 0 dia), 3–4 dias, 5–7 dias, 8–14 dias, 15+ dias | leito_dias | `8–14 dias` |
+| `ordem_faixa_pagamento` | número | Ordem da faixa de pagamento (1 a 5), só para classificar no Power BI | faixa_pagamento | `4` |
+| `fl_permanencia_longa` | número (0/1) | 1 = internação de mais de 15 dias | leito_dias > 15 | `0` |
 | `fl_fora_municipio` | número (0/1) | 1 = internado fora do município onde mora | MUNIC_RES ≠ MUNIC_MOV | `1` |
 | `fl_uti` | número (0/1) | 1 = passou pela UTI | UTI_MES_TO > 0 | `0` |
 | `dias_uti` | número | Dias de UTI | UTI_MES_TO | `0` |
 | `valor_pago` | número (R$) | Valor pago pelo SUS (não é o custo real do hospital) | VAL_TOT | `753.34` |
 | `valor_uti` | número (R$) | Parte do valor paga pela UTI. Sem os arquivos brutos, o script para com erro | VAL_UTI (`data/raw/sih`) | `0.00` |
+| `diarias_acompanhante` | número | Diárias de acompanhante pagas na internação. Sem os arquivos brutos, o script para com erro | DIAR_ACOM (`data/raw/sih`) | `10` |
+| `fl_acompanhante` | número (0/1) | 1 = teve diária de acompanhante paga | diarias_acompanhante > 0 | `1` |
 
 #### fato_ocupacao_diaria
 
@@ -554,7 +559,8 @@ Todas em `data/gold/girosus/`. Regras: só AIH regular (IDENT = 1), safra = ano 
 | Coluna | Tipo | O que é | Origem / regra | Exemplo |
 |---|---|---|---|---|
 | `data` | data | Dia do calendário (17/05/2024 a 31/12/2025). Começa em 2024 só para ligar as AIHs cobradas em 2025 de quem entrou em 2024 | gerado pelo script | `2025-05-20` |
-| `ano / mes / trimestre` | número | Ano, mês e trimestre da data | data | `2025 / 5 / 2` |
+| `ano` | número | Ano da data | data | `2025` |
+| `mes` | número | Mês da data (1 a 12) | data | `5` |
 | `nome_mes` | texto | Mês abreviado (jan…dez). Classificar por `mes` | data | `mai` |
 | `ano_mes` | texto | AAAA-MM | data | `2025-05` |
 | `dia_semana` | número | 1 = segunda … 7 = domingo | data | `2` |
@@ -651,7 +657,7 @@ Eles seguem uma ordem numerada, e cada um tem um papel:
 * **`01`, `02`, `03`:** exploração de cada fonte sozinha (SIH, CNES, IBGE): tamanho, tipos, valores vazios e duplicados.
 * **`04`:** primeira versão da consolidação multianual, que hoje o pipeline faz.
 * **`05`:** análise integrada, cruzando as três fontes (é anterior ao GiroSUS e não alimenta o painel).
-* **`06_girosus_ocupacao_leitos`:** análise do GiroSUS. Calcula, na safra 2025, todos os números do material do produto e responde as 34 perguntas do painel em três níveis (o retrato, onde e quem, onde agir), além das curiosidades sobre como o SUS paga uma internação.
+* **`06_girosus_ocupacao_leitos`:** análise do GiroSUS. Calcula, na safra 2025, os números do material do produto e responde as perguntas P1 a P34 do painel em três níveis (o retrato, onde e quem, onde agir), além das curiosidades sobre como o SUS paga uma internação. A sazonalidade (P35 a P40) e a tendência saem do `gerar_modelo_bi_girosus.py`.
 
 Os notebooks de análise (`05` e `06`) leem sempre `data/silver`, nunca os dados brutos. Assim todo mundo analisa a mesma versão conferida.
 </details>
@@ -984,7 +990,7 @@ O que já existe e o que falta. Legenda: ✅ pronto · ❌ falta.
 <summary>📓 Análises</summary>
 
 * ✅ **Notebooks 01 a 05**: exploração, consolidação e análise integrada.
-* ✅ **Notebook `06_girosus_ocupacao_leitos`**: análise do GiroSUS, com as 34 perguntas.
+* ✅ **Notebook `06_girosus_ocupacao_leitos`**: análise do GiroSUS, com as perguntas P1 a P34. A sazonalidade (P35 a P40) e a tendência saem do `gerar_modelo_bi_girosus.py`.
 * ❌ **Notebooks 01, 02 e 04** lendo os `.parquet` de `data/raw`: hoje ainda dependem dos `.dbc`.
 </details>
 
