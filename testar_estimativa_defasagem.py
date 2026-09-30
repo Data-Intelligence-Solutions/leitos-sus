@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Teste da estimativa dos meses incompletos (defasagem do SIH) — GiroSUS.
+GiroSUS: teste da estimativa dos meses incompletos (defasagem do SIH).
 
 Por que existe:
     O SIH chega com atraso: o hospital apresenta a conta (AIH) no mês da alta ou

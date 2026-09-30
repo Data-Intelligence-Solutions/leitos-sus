@@ -152,7 +152,7 @@ PROC_PSIQUIATRIA = "0303170190"
 
 # Pág. 9: quem fica pouco e quem fica muito.
 FAIXAS_DURACAO = ([-1, 0, 3, 7, 15, 30, np.inf], ["0 dia", "1–3", "4–7", "8–15", "16–30", "> 30"])
-# Pág. 4: pacote pago x dias internado (0 dia entra junto com 1–2).
+# Pág. 4: pacote pago x dias internado (0 dia entra junto com 1 a 2 dias).
 FAIXAS_PAGAMENTO = ([-1, 2, 4, 7, 14, np.inf], ["1–2 dias", "3–4 dias", "5–7 dias", "8–14 dias", "15+ dias"])
 
 # P29: anos da tendência. 2021 fica de fora: quem já estava internado em jan/2021
@@ -166,7 +166,7 @@ NOMES_MES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out
 NOMES_DIA = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"]
 
 
-# --------------------------------------------------------------------------- leitura
+# Leitura
 
 def classificar_grupo(cid) -> str:
     if pd.isna(cid) or len(cid) == 0:
@@ -227,7 +227,7 @@ def ler_nomes_manuais(tabela: str, chave: str, coluna: str) -> dict:
     return dict(zip(antigo[chave], antigo[coluna]))
 
 
-# --------------------------------------------------------------------------- tabelas
+# Tabelas
 
 def montar_fato_internacoes(df: pd.DataFrame, raw: pd.DataFrame | None) -> pd.DataFrame:
     fato = pd.DataFrame({
@@ -430,7 +430,7 @@ def montar_dim_procedimento(fato: pd.DataFrame) -> pd.DataFrame:
     return dim
 
 
-# --------------------------------------------------------------------------- gravação
+# Gravação
 
 def gravar(tabela: pd.DataFrame, caminho: Path) -> None:
     try:
@@ -510,7 +510,7 @@ def conferir_saida() -> None:
         raise SystemExit("\nERRO na saida:\n  - " + "\n  - ".join(problemas))
 
 
-# --------------------------------------------------------------------------- conferência do PDF
+# Conferência do PDF
 
 def _pct(parte, total) -> float:
     return parte / total * 100 if total else float("nan")
@@ -717,11 +717,11 @@ def conferir_numeros_pdf(numeros: list[tuple], ocupacao_completa: bool) -> None:
     divergentes, pulados, pagina = [], 0, None
     for pag, desc, valor, esperado, tol, ocup in numeros:
         if pag != pagina:
-            print(f"  -- pagina {pag} do PDF")
+            print(f"  pagina {pag} do PDF")
             pagina = pag
         if ocup and not ocupacao_completa:
             pulados += 1
-            print(f"  --   {desc}: {valor:,.1f} (esperado {esperado:,.1f}) PULADO")
+            print(f"  ..   {desc}: {valor:,.1f} (esperado {esperado:,.1f}) PULADO")
             continue
         ok = abs(valor - esperado) <= tol + 1e-9
         print(f"  {'OK' if ok else 'XX'}   {desc}: {valor:,.1f} (esperado {esperado:,.1f})")
@@ -736,7 +736,7 @@ def conferir_numeros_pdf(numeros: list[tuple], ocupacao_completa: bool) -> None:
     print(f"  Todos os {len(numeros) - pulados} numeros conferidos batem com o PDF.")
 
 
-# --------------------------------------------------------------------------- execução
+# Execução
 
 def main() -> None:
     print(f"Gerando as tabelas do GiroSUS em: {PASTA_SAIDA}")

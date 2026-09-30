@@ -506,7 +506,7 @@ Arquivo: `data/silver/populacao_multianual.parquet` · 1 linha = 1 município em
 | `ano_referencia` | número | Ano a que a população se refere (2021 a 2026) | Criada em `src/transform/populacao.py` | `2025` |
 | `ano_publicacao` | número | Ano em que o IBGE publicou. Vazio em 2023 (valor calculado pelo projeto) | Criada em `src/transform/populacao.py` | `2025` |
 | `origem` | texto | IBGE ou “Cálculo próprio com dados IBGE” (2023) | Criada em `src/transform/populacao.py` | `IBGE` |
-| `tipo_dado` | texto | Tipo da fonte: estimativa anual, Censo 2022 (TCU) ou interpolação 2022–2024 | Criada em `src/transform/populacao.py` | `Estimativa populacional` |
+| `tipo_dado` | texto | Tipo da fonte: estimativa anual, Censo 2022 (TCU) ou interpolação 2022 a 2024 | Criada em `src/transform/populacao.py` | `Estimativa populacional` |
 </details>
 
 <details>
@@ -568,7 +568,7 @@ Todas em `data/gold/girosus/`. Regras: só AIH regular (IDENT = 1), safra = ano 
 |---|---|---|---|---|
 | `cid` | texto | Código CID-10 | DIAG_PRINC | `J189` |
 | `capitulo` | texto | 1ª letra do CID | DIAG_PRINC | `J` |
-| `grupo_doenca` | texto | Grupo: Lesões e traumas, Respiratório, Circulatório, Infecciosas, Digestivo, Gravidez e parto, Câncer, Saúde mental… | capítulo da CID-10 (D00–D48 = Câncer; D50–D89 = Sangue; S e T = Lesões e traumas) | `Respiratório` |
+| `grupo_doenca` | texto | Grupo: Lesões e traumas, Respiratório, Circulatório, Infecciosas, Digestivo, Gravidez e parto, Câncer, Saúde mental… | capítulo da CID-10 (D00 a D48 = Câncer; D50 a D89 = Sangue; S e T = Lesões e traumas) | `Respiratório` |
 
 #### dim_procedimento
 
