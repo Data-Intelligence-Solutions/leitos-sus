@@ -6,11 +6,16 @@ Projeto de análise da demanda hospitalar em Goiás com dados públicos do SUS. 
 
 O produto final é o **GiroSUS**: um painel no Power BI que mostra **quem ocupa os leitos do SUS em Goiás, por quanto tempo e quanto isso custa**. Ele olha todas as causas de internação e mede tudo em **leito-dia** (um paciente ocupando um leito por um dia).
 
+> **O que é o GiroSUS, em uma frase:** GiroSUS é um painel de Power BI para **planejamento** da ocupação de leitos do SUS em Goiás, feito com dado oficial e mensal das internações (SIH/SUS). **Não é uma ferramenta de gestão de leitos em tempo real.**
+>
+> **Usamos uma ferramenta de leito?** Não. O GiroSUS não usa censo hospitalar, sistema de regulação nem cadastro de leitos. Ele mede o uso do leito a partir das internações pagas pelo SUS. O CNES (leitos cadastrados) só foi usado na exploração.
+
 > **Em 30 segundos:** os dados do SUS entram em `data/raw`, o código limpa e organiza, os testes conferem, o script `gerar_modelo_bi_girosus.py` monta as tabelas do painel e o Power BI mostra o resultado. O material completo do produto (pitch, gráficos, perguntas, guia do analista e método) está em [`dashboard/GiroSUS_painel_ocupacao_leitos.pdf`](dashboard/GiroSUS_painel_ocupacao_leitos.pdf).
 
 ## Sumário
 
 * [O produto GiroSUS](#o-produto-girosus)
+  * [Como lidamos com a defasagem](#como-lidamos-com-a-defasagem)
 * [Onde está cada coisa](#onde-está-cada-coisa)
 * [Como rodar o projeto](#como-rodar-o-projeto)
 * [Como os dados andam](#como-os-dados-andam)
@@ -36,7 +41,7 @@ Contar internações esconde o que realmente pesa na rede: um paciente que fica 
 
 Por que isso importa: o SUS paga um pacote fixo por procedimento. Então cada dia a mais de internação, além do necessário, é um leito a menos para outro paciente e um custo que o hospital banca sozinho.
 
-O painel serve para **planejar**, não para achar vaga agora: o dado do SUS chega com 1 a 2 meses de atraso.
+O painel serve para **planejar**, não para achar vaga agora: o dado do SUS chega com 1 a 2 meses de atraso. Veja [Como lidamos com a defasagem](#como-lidamos-com-a-defasagem).
 
 **Para quem:** diretores de hospital, Secretaria Estadual de Saúde e secretarias municipais.
 </details>
@@ -59,7 +64,7 @@ Por que o CNES ficou de fora: ele diz quantos leitos estão **cadastrados**, nã
 <summary>📦 Base, safra e números principais</summary>
 
 * **Base:** só o SIH/SUS (`data/silver/sih_multianual.parquet`).
-* **Safra:** competências de janeiro a dezembro de 2025, só AIH regular (IDENT = 1). O histórico de 2021 a junho de 2026 fica no modelo para ver tendência.
+* **Safra:** competências de janeiro a dezembro de 2025, só AIH regular (IDENT = 1). A tendência de 2022 a 2025 fica na tabela `tendencia_anual` (média de internados por dia em cada ano).
 * **Números de 2025:** 457.403 internações, 1.835.227 leitos-dia, R$ 726,1 milhões pagos, permanência média de 4,0 dias e R$ 396 por leito-dia.
 </details>
 
@@ -71,7 +76,34 @@ Por que o CNES ficou de fora: ele diz quantos leitos estão **cadastrados**, nã
 * 43,9% dos leitos-dia ficaram acima do tempo típico do procedimento. Reduzir 10% desses dias equivale a cerca de 20 mil internações a mais por ano, com os mesmos leitos.
 * Goiânia concentra 44,7% dos leitos-dia do estado, e 56,6% deles são usados por moradores de outras cidades.
 
+* **Tendência:** a rede cresce todo ano. Média de pacientes internados por dia: 4.398 em 2022, 4.734 em 2023 (+7,6%), 4.854 em 2024 (+2,5%) e 5.053 em 2025 (+4,1%).
+
 Antes do GiroSUS, o projeto fez uma análise só de doenças respiratórias (continua no histórico do Git). Ela mostrou que essas internações são cerca de 9% do total em Goiás, com pico entre abril e junho; que municípios menores têm mais internação por habitante; e que, comparadas às demais, têm mais que o dobro de mortalidade, ficam mais tempo e usam UTI quase duas vezes mais.
+</details>
+
+<details>
+<summary>⏱️ Como lidamos com a defasagem</summary>
+
+#### Como lidamos com a defasagem
+
+O SIH chega com 1 a 2 meses de atraso: o hospital apresenta a conta (AIH) no mês da alta ou nos meses seguintes. O GiroSUS lida com isso em quatro camadas:
+
+1. **Transparência:** o painel mostra a data de corte e marca cada mês como *fechado*, *em consolidação* ou *estimado*. O gestor sempre sabe o que já está completo.
+2. **Decisão baseada em mês fechado:** os números principais, como os leitos presos além do típico e o simulador, usam a safra fechada. A defasagem não muda a decisão, só atrasa o mês mais recente.
+3. **Estimativa dos meses incompletos:** o atraso da cobrança é estável (65% das internações chegam no mesmo mês da alta e 99% em até 3 meses). Por isso dá para completar os meses recentes. Testado com 2025: no mês mais recente, erro de 8,4%, contra 29% olhando só o que chegou; um mês antes, erro de 2,7%. Isso aparece como "estimado", com faixa de erro.
+4. **Atualização mensal:** todo mês o estimado vira real, e o painel mostra quanto errou (o placar de acerto). Opção de piloto: o hospital contratante pode mandar os dados dele do mês corrente, para ver o "agora" dele mesmo.
+
+**Gestão de custo com a defasagem.** Regra: **custo estimado do mês = leitos-dia estimados × R$ por leito-dia dos últimos 3 meses fechados, calculado por grupo de doença.** Por grupo e com meses recentes porque o R$ por leito-dia é estável, mas não é fixo: em 2025 variou entre R$ 361 e R$ 427 por mês e subiu no segundo semestre. Uma média do ano inteiro puxaria o valor para trás. Testado com 2025: erro de 4,8% no mês mais recente (contra 32,2% olhando só o que chegou) e de 4,0% um mês antes.
+
+**Onde terei leito disponível?** O GiroSUS não diz onde há leito livre hoje. Ele mostra **quando e onde a pressão é menor**: dezembro e janeiro são os meses mais vazios (−4,9% e −3,4% da média do ano), o fim de semana tem menos entradas (cerca de 940 por dia, contra 1.435 na terça) e há hospitais e municípios com menos dias acima do típico. Para ir além, dá para cruzar com o CNES (leitos SUS cadastrados) e estimar a taxa de ocupação por hospital, com um aviso: leito cadastrado não é leito em operação.
+
+**Situação hoje:** o painel usa a safra 2025 completa, com todos os meses fechados. A estimativa dos meses incompletos e do custo já foi testada; a marcação por mês e o placar de acerto entram quando o painel passar a ser atualizado todo mês. Para repetir o teste:
+
+```bash
+python testar_estimativa_defasagem.py
+```
+
+Ele mede o atraso da cobrança, refaz as estimativas de 2025 "voltando no tempo" e para com ERRO se algum número do slide mudar.
 </details>
 
 ## Onde está cada coisa
@@ -83,9 +115,13 @@ Antes do GiroSUS, o projeto fez uma análise só de doenças respiratórias (con
 |---|---|---|
 | Material do produto: pitch, 7 páginas do painel com gráficos, 34 perguntas, perguntas de cliente e banca, guia do analista e método | `dashboard/GiroSUS_painel_ocupacao_leitos.pdf` | Clientes, analistas e avaliadores |
 | Análise com todos os números do GiroSUS | `notebooks/06_girosus_ocupacao_leitos.ipynb` | Analistas |
-| Tabelas que o Power BI importa (8 arquivos `.csv`) | geradas por `gerar_modelo_bi_girosus.py` em `data/gold/girosus/` | Analista de BI |
+| Tabelas que o Power BI importa (10 arquivos `.csv`) | geradas por `gerar_modelo_bi_girosus.py` em `data/gold/girosus/` | Analista de BI |
 | O que significa cada coluna | seção [Dicionário de dados](#dicionário-de-dados) e `docs/dicionário/dicionario_dados.csv` | Todo mundo |
-| Como o código funciona, pasta por pasta | `docs/code/como_funciona.pdf` | Quem vai mexer no código |
+| Como o código funciona, pasta por pasta, e a lista de todos os tratamentos feitos nos dados | `docs/code/como_funciona.pdf` | Quem vai mexer no código |
+| Material de negócio do painel (perguntas, gráficos e regras) | `docs/bi/modelagem_bi.pdf` | Quem apresenta e o cliente |
+| Todas as medidas DAX, por página e pergunta | `docs/bi/modelagem_dax.pdf` | Analista de BI |
+| Apresentação (PowerPoint) e pitch curto em PDF | `docs/apresentacao/` | Quem apresenta e quem assistiu |
+| Teste da estimativa dos meses incompletos (defasagem) | `testar_estimativa_defasagem.py` | Quem precisa provar os números da defasagem |
 </details>
 
 <details>
@@ -100,8 +136,10 @@ leitos-sus/
 │   ├── silver/                     # Bases conferidas pelos testes; é daqui que as análises leem
 │   └── gold/girosus/               # Tabelas do Power BI em CSV (geradas na sua máquina, fora do Git)
 ├── 📖 docs/
+│   ├── apresentacao/               # Apresentação (.pptx) e pitch curto (.pdf)
+│   ├── bi/                         # modelagem_bi.pdf (negócio) e modelagem_dax.pdf (medidas DAX)
 │   ├── dicionário/                 # dicionario_dados.csv: o dicionário em planilha
-│   └── code/                       # como_funciona.pdf: explicação do código
+│   └── code/                       # como_funciona.pdf: explicação do código e lista dos tratamentos
 ├── 📓 notebooks/                   # Exploração e análises (06_girosus_ocupacao_leitos = GiroSUS)
 ├── 🐍 src/
 │   ├── config.py                   # Caminhos e parâmetros (anos, estado) num lugar só
@@ -113,6 +151,7 @@ leitos-sus/
 │   └── orchestration/              # O mesmo pipeline, organizado com Prefect
 ├── ✅ tests/                       # Testes de qualidade (pytest)
 ├── gerar_modelo_bi_girosus.py      # Monta as tabelas do Power BI em data/gold/girosus
+├── testar_estimativa_defasagem.py  # Testa a estimativa dos meses incompletos (defasagem do SIH)
 ├── requirements.txt                # Bibliotecas do projeto
 └── README.md                       # Este arquivo
 ```
@@ -148,7 +187,7 @@ Com o ambiente ativo:
 python gerar_modelo_bi_girosus.py
 ```
 
-O que acontece: o script lê `data/silver`, aplica as regras do GiroSUS e grava as **8 tabelas do Power BI em `.csv`** em `data/gold/girosus/`. Leva cerca de 1 minuto e meio. Se houver `.parquet` antigos nessa pasta, o script apaga, para ninguém se confundir.
+O que acontece: o script lê `data/silver`, aplica as regras do GiroSUS e grava as **10 tabelas do Power BI em `.csv`** em `data/gold/girosus/`. Leva cerca de 1 minuto e meio. Se houver `.parquet` antigos nessa pasta, o script apaga, para ninguém se confundir.
 
 Os CSVs usam o padrão brasileiro: separador `;` e decimal `,` (por exemplo, `485,78`). O Excel e o Power BI em português abrem direto. Feche esses arquivos no Excel antes de rodar, senão o script não consegue regravar e avisa.
 
@@ -309,25 +348,31 @@ Vai criar um indicador novo? Aplique os mesmos filtros, senão seus números nã
 
 ## Modelo do Power BI
 
-O script `gerar_modelo_bi_girosus.py` (veja [Como rodar o projeto](#como-rodar-o-projeto)) entrega 2 tabelas fato (os acontecimentos) e 6 dimensões (as “legendas” usadas nos filtros).
+O script `gerar_modelo_bi_girosus.py` (veja [Como rodar o projeto](#como-rodar-o-projeto)) entrega 2 tabelas fato (os acontecimentos), 6 dimensões (as “legendas” usadas nos filtros) e 1 tabela de apoio de sazonalidade, sem relacionamento.
 
 <details>
 <summary>🗃️ As tabelas geradas</summary>
 
 | Arquivo | Cada linha é | Linhas |
 |---|---|---|
-| `fato_internacoes` | Uma internação (AIH regular), de todas as safras | 2,2 milhões |
-| `fato_ocupacao_diaria` | Um hospital, num dia, num grupo de doença (internados, entradas e altas) | 2,0 milhões |
-| `dim_tempo` | Um dia do calendário (2020 a 2026) | 2.557 |
-| `dim_diagnostico` | Um código CID-10, com o grupo de doença | 8.327 |
-| `dim_procedimento` | Um procedimento da tabela SIGTAP | 1.586 |
-| `dim_hospital` | Um hospital (CNES) | 303 |
-| `dim_municipio_residencia` e `dim_municipio_atendimento` | Um município (mesma tabela, uma para cada lado da relação) | 2.362 |
+| `fato_internacoes` | Uma internação (AIH regular) da safra 2025 | 457.403 |
+| `fato_ocupacao_diaria` | Um hospital, num dia de 2025, num grupo de doença (internados, entradas e altas) | 392.172 |
+| `dim_tempo` | Um dia do calendário (17/05/2024 a 31/12/2025: a 1ª internação da safra 2025 até o fim de 2025) | 594 |
+| `dim_diagnostico` | Um código CID-10, com o grupo de doença | 6.114 |
+| `dim_procedimento` | Um procedimento da tabela SIGTAP | 1.346 |
+| `dim_hospital` | Um hospital (CNES) | 260 |
+| `dim_municipio_residencia` e `dim_municipio_atendimento` | Um município (mesma tabela, uma para cada lado da relação) | 1.241 |
+| `sazonalidade_mensal` | Um mês de 2025 num grupo de doença, mais a linha "Total da rede" (tabela de apoio, sem relacionamento; um mapa de calor de sazonalidade) | 252 |
+| `tendencia_anual` | Um ano (2022 a 2025) com a média de pacientes internados por dia (tabela de apoio, sem relacionamento; a tendência da P29) | 4 |
 
-* Todas saem em `.csv` (separador `;`, decimal `,`). No Power BI: Obter dados > Texto/CSV, uma tabela por arquivo.
-* Na importação, deixe `cnes`, `proc_rea`, `cid`, `codigo`, `munic_residencia` e `munic_atendimento` como **Texto**. Senão o Power BI tira o zero da frente (`0965324` vira `965324`).
-* Em `dim_hospital.csv` e `dim_procedimento.csv`, as colunas `nome_hospital` e `nome_procedimento` vêm em branco, para preencher à mão pela consulta pública do CNES e pela tabela SIGTAP.
-* O valor da UTI (`VAL_UTI`) ainda não está na silver, então o script lê direto de `data/raw/sih`. Se esses arquivos não estiverem na máquina, só a coluna `valor_uti` fica vazia.
+* Todas saem em `.csv` (separador `;`, decimal `,`).
+* **Importação pronta:** o script também grava `data/gold/girosus/power_query/<tabela>.pq`, uma consulta por tabela. Ela já lê o `;` e o decimal `,` (pt-BR) e já deixa `cnes`, `proc_rea`, `cid`, `codigo`, `munic_residencia` e `munic_atendimento` como **Texto**, sem perder o zero da frente (`0965324` não vira `965324`). No Power BI: Obter dados > Consulta nula > Editor avançado, cole o conteúdo do `.pq` e renomeie a consulta com o nome da tabela. Repita para as 8 tabelas.
+* O caminho do `.csv` dentro do `.pq` é o da pasta onde o script rodou. Se o projeto mudar de pasta, rode o script de novo (ou ajuste a linha `Arquivo`).
+* **Tudo olha só para a safra 2025**, como o PDF. A ocupação diária usa também as AIHs cobradas em 2024 e 2026 para contar quem estava internado nos dias de 2025, e depois fica só com os dias de 2025.
+* O script para com ERRO se qualquer célula de qualquer tabela vier vazia.
+* Em `dim_procedimento.csv`, `nome_procedimento` traz 8 nomes definidos no script. Os demais vêm como `Procedimento <código>`, porque nenhuma base local (SIH, CNES, IBGE) tem o nome do procedimento. Se você trocar à mão pelo nome da tabela SIGTAP, o script preserva na próxima execução.
+* O SIH não tem o nome do hospital. O hospital vem da coluna `CNES` do SIH (código do Cadastro Nacional de Estabelecimentos de Saúde, 7 dígitos), e os arquivos de leitos do CNES do projeto (`LTGO*`) também não têm o nome. Por isso `dim_hospital.csv` identifica o hospital pelo `cnes` e pelo município e **não tem** `nome_hospital` (a coluna sairia vazia; o script para com erro se ela aparecer).
+* O valor da UTI (`VAL_UTI`) ainda não está na silver, então o script lê direto de `data/raw/sih`. Se esses arquivos não estiverem na máquina, o script para com erro (em vez de gerar `valor_uti` vazio).
 
 O que é cada coluna: [Dicionário de dados › Tabelas do painel GiroSUS](#dicionário-de-dados).
 </details>
@@ -372,7 +417,7 @@ Os arquivos do DATASUS vêm com nomes curtos e códigos que não dizem nada sozi
 
 Use sempre que for criar um indicador, montar um gráfico ou explicar um número numa apresentação.
 
-Ele cobre 93 colunas: SIH (23, a base do produto), as tabelas do painel (48), e também CNES (12) e IBGE (10), que existem no projeto como bases de exploração e apoio.
+Ele cobre 105 colunas: SIH (23, a base do produto), as tabelas do painel (60), e também CNES (12) e IBGE (10), que existem no projeto como bases de exploração e apoio.
 </details>
 
 <details>
@@ -461,7 +506,7 @@ Arquivo: `data/silver/populacao_multianual.parquet` · 1 linha = 1 município em
 <details>
 <summary>📊 Tabelas do painel GiroSUS (gold)</summary>
 
-Todas em `data/gold/girosus/`. Regras: só AIH regular (IDENT = 1), safra = ano da competência (padrão do painel: 2025), todas as causas de internação.
+Todas em `data/gold/girosus/`. Regras: só AIH regular (IDENT = 1), safra = ano da competência (só a safra 2025), todas as causas de internação.
 
 #### fato_internacoes
 
@@ -486,14 +531,14 @@ Todas em `data/gold/girosus/`. Regras: só AIH regular (IDENT = 1), safra = ano 
 | `fl_uti` | número (0/1) | 1 = passou pela UTI | UTI_MES_TO > 0 | `0` |
 | `dias_uti` | número | Dias de UTI | UTI_MES_TO | `0` |
 | `valor_pago` | número (R$) | Valor pago pelo SUS (não é o custo real do hospital) | VAL_TOT | `753.34` |
-| `valor_uti` | número (R$) | Parte do valor paga pela UTI. Vazio se os arquivos brutos não estiverem na máquina | VAL_UTI (`data/raw/sih`) | `0.00` |
+| `valor_uti` | número (R$) | Parte do valor paga pela UTI. Sem os arquivos brutos, o script para com erro | VAL_UTI (`data/raw/sih`) | `0.00` |
 
 #### fato_ocupacao_diaria
 
 | Coluna | Tipo | O que é | Origem / regra | Exemplo |
 |---|---|---|---|---|
 | `cnes` | texto | Hospital | CNES | `7743068` |
-| `data` | data | Dia (01/01/2021 a 30/06/2026) | calendário | `2025-05-20` |
+| `data` | data | Dia de 2025 (01/01/2025 a 31/12/2025) | calendário | `2025-05-20` |
 | `grupo_doenca` | texto | Grupo de doença (capítulo da CID-10) | DIAG_PRINC | `Respiratório` |
 | `pacientes_internados` | número | Pacientes internados no dia: entrou até o dia e saiu depois dele | DT_INTER, DT_SAIDA | `422` |
 | `entradas` | número | Internações que começaram no dia | DT_INTER | `94` |
@@ -503,7 +548,7 @@ Todas em `data/gold/girosus/`. Regras: só AIH regular (IDENT = 1), safra = ano 
 
 | Coluna | Tipo | O que é | Origem / regra | Exemplo |
 |---|---|---|---|---|
-| `data` | data | Dia do calendário (2020 a 2026) | gerado pelo script | `2025-05-20` |
+| `data` | data | Dia do calendário (17/05/2024 a 31/12/2025). Começa em 2024 só para ligar as AIHs cobradas em 2025 de quem entrou em 2024 | gerado pelo script | `2025-05-20` |
 | `ano / mes / trimestre` | número | Ano, mês e trimestre da data | data | `2025 / 5 / 2` |
 | `nome_mes` | texto | Mês abreviado (jan…dez). Classificar por `mes` | data | `mai` |
 | `ano_mes` | texto | AAAA-MM | data | `2025-05` |
@@ -526,16 +571,15 @@ Todas em `data/gold/girosus/`. Regras: só AIH regular (IDENT = 1), safra = ano 
 | `proc_rea` | texto | Código do procedimento SIGTAP | PROC_REA | `0303140151` |
 | `diagnostico_mais_comum` | texto | CID que mais aparece com esse procedimento | DIAG_PRINC | `J189` |
 | `tempo_tipico_2025` | número | Mediana de dias do procedimento na safra 2025 | DIAS_PERM | `4` |
-| `nome_procedimento` | texto | Nome oficial. Vem em branco: preencher pela tabela SIGTAP | manual | `Tratamento de pneumonias ou influenza (gripe)` |
+| `nome_procedimento` | texto | 8 nomes definidos no script; os demais `Procedimento <código>` (nenhuma base local tem o nome). Pode trocar à mão pelo nome SIGTAP | script / manual | `Pneumonia ou gripe` |
 
 #### dim_hospital
 
 | Coluna | Tipo | O que é | Origem / regra | Exemplo |
 |---|---|---|---|---|
-| `cnes` | texto | Código do hospital | CNES | `0965324` |
+| `cnes` | texto | Código do hospital. O SIH não tem o nome do hospital | coluna CNES do SIH (RD) | `0965324` |
 | `municipio_atendimento` | texto | Município do hospital (o mais frequente para aquele CNES) | MUNIC_MOV | `520870` |
 | `nome_municipio` | texto | Nome do município | tabela do IBGE | `Goiânia` |
-| `nome_hospital` | texto | Nome do hospital. Vem em branco: preencher pela consulta pública do CNES | manual | — |
 
 #### dim_municipio_residencia / dim_municipio_atendimento
 
@@ -545,6 +589,32 @@ Todas em `data/gold/girosus/`. Regras: só AIH regular (IDENT = 1), safra = ano 
 | `nome` | texto | Nome do município | tabela do IBGE | `Trindade` |
 | `uf` | texto | Estado | tabela do IBGE | `GO` |
 | `fl_goias` | número (0/1) | 1 = município de Goiás (código começa com 52) | codigo | `1` |
+
+#### sazonalidade_mensal
+
+Tabela de apoio, sem relacionamento. Alimenta o mapa de calor da página 11 do PDF (sazonalidade). No Power BI: visual Matriz com `grupo_doenca` nas linhas, `nome_mes` nas colunas e `variacao_pct` com formatação condicional. Não some `internados_dia` entre grupos e o total.
+
+| Coluna | Tipo | O que é | Origem / regra | Exemplo |
+|---|---|---|---|---|
+| `mes` | número | Mês (1 a 12) | data da ocupação diária | `5` |
+| `nome_mes` | texto | Mês abreviado. Classificar por `mes` | mes | `mai` |
+| `grupo_doenca` | texto | Grupo de doença, ou `Total da rede` | fato_ocupacao_diaria | `Respiratório` |
+| `fl_total` | número (0/1) | 1 = linha da rede inteira | grupo_doenca | `0` |
+| `internados_dia` | número | Média de pacientes internados por dia no mês (dias sem paciente contam como 0) | pacientes_internados | `818,0` |
+| `media_ano` | número | Média de internados por dia no ano, do mesmo grupo | internados_dia | `624,8` |
+| `variacao_pct` | número | Quanto o mês fica acima (+) ou abaixo (−) da média do ano do grupo, em % | internados_dia / media_ano − 1 | `30,9` |
+| `fl_pico` | número (0/1) | 1 = mês mais cheio do grupo | internados_dia | `1` |
+| `fl_vale` | número (0/1) | 1 = mês mais vazio do grupo | internados_dia | `0` |
+
+#### tendencia_anual
+
+Tabela de apoio, sem relacionamento. Mostra se a rede cresce ano a ano (P29). O valor de 2025 é o mesmo "média do ano" do Total da rede na `sazonalidade_mensal` (5.052,8). 2021 fica de fora porque o começo da base não tem quem entrou em 2020.
+
+| Coluna | Tipo | O que é | Origem / regra | Exemplo |
+|---|---|---|---|---|
+| `ano` | número | Ano (2022 a 2025) | data da ocupação diária | `2025` |
+| `internados_dia` | número | Média de pacientes internados por dia no ano (média dos 12 meses), com as AIHs de todas as safras | mesma regra de `pacientes_internados` | `5052,8` |
+| `fl_ano_painel` | número (0/1) | 1 = ano da safra do painel (2025) | ano | `1` |
 </details>
 
 <details>
@@ -629,11 +699,12 @@ Rode na ordem. Cada comando precisa terminar sem nenhuma linha de `ERRO`:
 | `python -m src.orchestration.prefect_flow` | As mesmas 3 linhas OK, no meio dos logs do Prefect, e o flow terminando como `Completed` |
 | `python -m src.promover_silver` | 12 passed, 3 arquivos copiados, 3 passed e "Silver atualizada" |
 | `python -m pytest` | 15 passed |
-| `python gerar_modelo_bi_girosus.py` | Conferência de 2025 batendo (457.403 · 1.835.227 · 726,1 · 43,9) e 8 linhas OK |
+| `python gerar_modelo_bi_girosus.py` | Conferência de 2025 batendo (457.403 · 1.835.227 · 726,1 · 43,9), 10 linhas OK e "Todos os 223 numeros conferidos batem" |
+| `python testar_estimativa_defasagem.py` | "OK: os 9 números do slide 'Como lidamos com a defasagem' batem" |
 
 Depois, confira à mão:
 
-* `data/gold/girosus/` tem 8 arquivos, todos `.csv`, nenhum `.parquet`.
+* `data/gold/girosus/` tem 10 arquivos, todos `.csv`, nenhum `.parquet`.
 * O `dim_hospital.csv` abre no Excel com as colunas separadas.
 * O notebook `06_girosus_ocupacao_leitos` roda inteiro (Run All) com os mesmos números.
 * O `git status` não mostra nada de `data/gold/girosus/` nem de `data/staging/`.
@@ -877,7 +948,7 @@ O que já existe e o que falta. Legenda: ✅ pronto · ❌ falta.
 * ✅ **Dados brutos** (`data/raw/`): SIH de jan/2021 a jun/2026 (base do produto); CNES de jan/2021 a jul/2026 e planilhas do IBGE (exploração e apoio). SIH e CNES em Parquet, convertidos do `.dbc` por `src/converter_dbc.py`.
 * ✅ **Staging** (`data/staging/`): gerada pelo pipeline, só na sua máquina.
 * ✅ **Silver** (`data/silver/`): SIH, CNES e população, conferidas e promovidas por `src/promover_silver.py`.
-* ✅ **Tabelas do painel** (`data/gold/girosus/`): 8 tabelas em CSV, geradas pelo script, só na sua máquina.
+* ✅ **Tabelas do painel** (`data/gold/girosus/`): 10 tabelas em CSV, geradas pelo script, só na sua máquina.
 * ❌ **Download automático** dos `.dbc` do DATASUS: hoje é feito à mão no site.
 </details>
 
@@ -890,6 +961,7 @@ O que já existe e o que falta. Legenda: ✅ pronto · ❌ falta.
 * ✅ **Pipeline** (`src/pipeline.py`) e **orquestração com Prefect** (`src/orchestration/`), com mensagens na tela.
 * ✅ **Promoção automática** da staging para a silver, com testes antes e depois (`src/promover_silver.py`).
 * ✅ **Script do painel** (`gerar_modelo_bi_girosus.py`): aplica as regras do GiroSUS, gera os CSVs e confere o resultado.
+* ✅ **Teste da defasagem** (`testar_estimativa_defasagem.py`): mede o atraso da cobrança e testa a estimativa dos meses incompletos e do custo com 2025.
 * ✅ **Testes** (`tests/`): 15 testes com pytest.
 </details>
 
@@ -907,7 +979,9 @@ O que já existe e o que falta. Legenda: ✅ pronto · ❌ falta.
 * ✅ **README** (este arquivo), com o [Dicionário de dados](#dicionário-de-dados).
 * ✅ **Dicionário em planilha**: `docs/dicionário/dicionario_dados.csv`.
 * ✅ **PDF do produto**: `dashboard/GiroSUS_painel_ocupacao_leitos.pdf` (pitch, 34 perguntas e guia do analista).
-* ✅ **PDF do código**: `docs/code/como_funciona.pdf` (metodologia, pasta por pasta).
+* ✅ **PDF do código**: `docs/code/como_funciona.pdf` (metodologia, pasta por pasta, e a lista dos tratamentos).
+* ✅ **PDFs do painel**: `docs/bi/modelagem_bi.pdf` (negócio: pergunta, gráfico e regra) e `docs/bi/modelagem_dax.pdf` (medidas DAX).
+* ✅ **Apresentação e pitch**: `docs/apresentacao/GiroSUS_apresentacao.pptx` e `docs/apresentacao/GiroSUS_pitch.pdf`.
 </details>
 
 <details>
