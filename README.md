@@ -2,7 +2,7 @@
 
 Projeto de análise da demanda hospitalar em Goiás com dados públicos do SUS. A ideia é entender onde e como as internações apertam a rede de saúde.
 
-> **Base do produto: só o SIH/SUS.** O GiroSUS é construído inteiro com as internações do SIH (Sistema de Informações Hospitalares). O projeto também guarda o CNES (leitos) e o IBGE (população), usados na fase de exploração e no notebook `05`, mas eles **não entram** nos números do painel. Do IBGE, o GiroSUS usa apenas os nomes dos municípios. Veja [Por que só o SIH](#o-produto-girosus).
+> **Base do produto: só o SIH/SUS.** Todos os números do GiroSUS vêm do SIH/SUS (Sistema de Informações Hospitalares), inclusive o código do hospital, que é a coluna `CNES` do próprio SIH. O IBGE entra só para mostrar o nome dos municípios e não muda nenhum número. O CNES e a população do IBGE foram usados só na exploração (notebooks `02`, `03` e `05`), fora do painel. Veja [Por que só o SIH](#o-produto-girosus).
 
 O produto final é o **GiroSUS**: um painel no Power BI que mostra **quem ocupa os leitos do SUS em Goiás, por quanto tempo e quanto isso custa**. Ele olha todas as causas de internação e mede tudo em **leito-dia** (um paciente ocupando um leito por um dia).
 
@@ -58,6 +58,12 @@ O SIH é a única base que tem, numa linha só, **tudo o que o produto mede**: d
 | **CNES** (leitos) | Exploração (notebooks `02` e `05`) | ❌ Não |
 
 Por que o CNES ficou de fora: ele diz quantos leitos estão **cadastrados**, não quem os ocupa. Leito cadastrado não é leito em operação, e cruzar as duas bases exigiria premissas que o painel não precisa para responder as suas perguntas.
+
+**Por que o painel não mostra o nome do hospital, e qual o impacto.** O SIH não traz o nome do hospital: traz o código CNES, que é o identificador oficial de cada estabelecimento no país. Como o GiroSUS usa só o SIH, o hospital aparece como "código · município" (ex.: `7743068 · Goiânia`). Foi uma decisão: uma base oficial só, sem cadastro extra para baixar e manter, e sem risco de ligar um hospital ao nome errado ou de deixar o nome em branco.
+
+* **Impacto nos números: nenhum.** Todos os indicadores por hospital (leitos-dia, dias acima do típico, R$ por dia) são calculados pelo código CNES, e os 260 hospitais da safra 2025 têm código e município.
+* **Impacto na leitura:** o gestor vê o código em vez do nome. O diretor conhece o CNES do próprio hospital, e qualquer código pode ser consultado no site público do CNES ([cnes.datasus.gov.br](https://cnes.datasus.gov.br/)).
+* **Se o cliente quiser os nomes:** dá para acrescentar depois o cadastro de estabelecimentos do CNES como tabela de apoio, sem mudar nenhum número.
 </details>
 
 <details>
@@ -870,6 +876,16 @@ Atenção: esse comando desfaz **todas** as alterações não commitadas nos not
 ## Perguntas frequentes
 
 <details>
+<summary>🏥 Por que o painel não mostra o nome do hospital? Isso muda algum número?</summary>
+
+**Por que o painel não mostra o nome do hospital, e qual o impacto.** O SIH não traz o nome do hospital: traz o código CNES, que é o identificador oficial de cada estabelecimento no país. Como o GiroSUS usa só o SIH, o hospital aparece como "código · município" (ex.: `7743068 · Goiânia`). Foi uma decisão: uma base oficial só, sem cadastro extra para baixar e manter, e sem risco de ligar um hospital ao nome errado ou de deixar o nome em branco.
+
+* **Impacto nos números: nenhum.** Todos os indicadores por hospital (leitos-dia, dias acima do típico, R$ por dia) são calculados pelo código CNES, e os 260 hospitais da safra 2025 têm código e município.
+* **Impacto na leitura:** o gestor vê o código em vez do nome. O diretor conhece o CNES do próprio hospital, e qualquer código pode ser consultado no site público do CNES ([cnes.datasus.gov.br](https://cnes.datasus.gov.br/)).
+* **Se o cliente quiser os nomes:** dá para acrescentar depois o cadastro de estabelecimentos do CNES como tabela de apoio, sem mudar nenhum número.
+</details>
+
+<details>
 <summary>🐍 Qual linguagem e quais bibliotecas o projeto usa</summary>
 
 | Biblioteca | Para quê |
@@ -990,5 +1006,6 @@ O que já existe e o que falta. Legenda: ✅ pronto · ❌ falta.
 * ✅ **Modelo desenhado**: 2 fatos, 6 dimensões, 22 medidas DAX e o parâmetro "Redução %" (no PDF do produto).
 * ❌ **Arquivo `.pbix`** montado.
 * ❌ **Painel publicado**, com link, no Power BI Service.
-* ❌ **Nomes dos hospitais e dos procedimentos** (`dim_hospital.csv` e `dim_procedimento.csv`): hoje o painel mostra só os códigos.
+* ✅ **Campos vazios corrigidos** (`dim_hospital` e `dim_procedimento`): `nome_hospital` foi removido (o SIH não traz o nome do hospital) e todo procedimento tem nome ou o rótulo `Procedimento <código>`. O script para com ERRO se qualquer célula vier vazia.
+* ✅ **Decisão: só a base SIH.** O painel usa apenas o SIH/SUS, sem bases extras. Por isso o hospital aparece pelo código CNES e pelo município, e os procedimentos têm 8 nomes definidos no script; os demais aparecem como `Procedimento <código>`.
 </details>

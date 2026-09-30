@@ -11,10 +11,6 @@
 *.dbc
 *.dbf
 
-# Planilhas grandes do IBGE
-*.xls
-*.xlsx
-
 # Arquivos do Power BI e compactados
 *.pbix
 *.zip
