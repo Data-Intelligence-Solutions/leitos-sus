@@ -8,6 +8,13 @@ O produto final é o **GiroSUS**: um painel no Power BI que mostra **quem ocupa 
 
 > **Em 30 segundos:** os dados do SUS entram em `data/raw`, o código limpa e organiza, os testes conferem, o script `gerar_modelo_bi_girosus.py` monta as tabelas do painel e o Power BI mostra o resultado. O material completo do produto (pitch, gráficos, perguntas, guia do analista e método) está em [`dashboard/GiroSUS_painel_ocupacao_leitos.pdf`](dashboard/GiroSUS_painel_ocupacao_leitos.pdf).
 
+## Integrantes do grupo
+* Renata Aires: https://www.linkedin.com/in/renata-aires-saraiva
+* João Vitor: https://www.linkedin.com/in/jvfmagalhaes?utm_source=share_via&utm_content=profile&utm_medium=member_android
+* Lucas Parisotto: https://www.linkedin.com/in/lucas-parisotto-0ab7a93b5?utm_source=share_via&utm_content=profile&utm_medium=member_ios
+* Felipe Barbosa:
+* Ana Ruy: https://www.linkedin.com/in/ruyluques/
+
 ## Sumário
 
 * [O produto GiroSUS](#o-produto-girosus)
