@@ -12,6 +12,13 @@ O GiroSUS mostra **quem ocupa os leitos do SUS em Goiás, por quanto tempo e qua
 
 > **Em 30 segundos:** os dados do SUS entram em `data/raw`, o código limpa e organiza, os testes conferem, o script `gerar_modelo_bi_girosus.py` monta as tabelas do painel e o Power BI mostra o resultado. O material do produto fica em `docs/`: o painel página por página em [`docs/bi/GiroSUS_modelagem_bi.pdf`](docs/bi/GiroSUS_modelagem_bi.pdf), as medidas DAX em [`docs/bi/GiroSUS_modelagem_dax.pdf`](docs/bi/GiroSUS_modelagem_dax.pdf) e o pitch em [`docs/apresentacao/GiroSUS_pitch.pdf`](docs/apresentacao/GiroSUS_pitch.pdf).
 
+## Integrantes do grupo
+* Renata Aires: https://www.linkedin.com/in/renata-aires-saraiva
+* João Vitor: https://www.linkedin.com/in/jvfmagalhaes?utm_source=share_via&utm_content=profile&utm_medium=member_android
+* Lucas Parisotto: https://www.linkedin.com/in/lucas-parisotto-0ab7a93b5?utm_source=share_via&utm_content=profile&utm_medium=member_ios
+* Felipe Barbosa:
+* Ana Ruy: https://www.linkedin.com/in/ruyluques/
+
 ## Sumário
 
 * [O produto GiroSUS](#o-produto-girosus)
@@ -970,7 +977,6 @@ O que já existe e o que falta. Legenda: ✅ pronto · ❌ falta.
 * ✅ **Staging** (`data/staging/`): gerada pelo pipeline, só na sua máquina.
 * ✅ **Silver** (`data/silver/`): SIH, CNES e população, conferidas e promovidas por `src/promover_silver.py`.
 * ✅ **Tabelas do painel** (`data/gold/girosus/`): 10 tabelas em CSV, geradas pelo script, só na sua máquina.
-* ❌ **Download automático** dos `.dbc` do DATASUS: hoje é feito à mão no site.
 </details>
 
 <details>
@@ -991,7 +997,6 @@ O que já existe e o que falta. Legenda: ✅ pronto · ❌ falta.
 
 * ✅ **Notebooks 01 a 05**: exploração, consolidação e análise integrada.
 * ✅ **Notebook `06_girosus_ocupacao_leitos`**: análise do GiroSUS, com as perguntas P1 a P34. A sazonalidade (P35 a P40) e a tendência saem do `gerar_modelo_bi_girosus.py`.
-* ❌ **Notebooks 01, 02 e 04** lendo os `.parquet` de `data/raw`: hoje ainda dependem dos `.dbc`.
 </details>
 
 <details>
