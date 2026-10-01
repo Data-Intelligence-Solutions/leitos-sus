@@ -1,20 +1,37 @@
-# Arquivos grandes locais
+# ============================================================
+# Arquivos pesados: NÃO vão para o GitHub
+# ============================================================
+
+# Todos os CSVs (tabelas do painel, planilhas do IBGE etc.)
+*.csv
+# ...menos o dicionário de dados, que é pequeno e é documentação
+!docs/dicionário/GiroSUS_dicionario_dados.csv
+# Arquivos originais do DATASUS
 *.dbc
 *.dbf
-data/raw/ibge/censo_2022/Pessoas_52_publico.csv
+
+# Arquivos do Power BI e compactados
+*.pbix
+*.zip
+*.7z
+*.rar
+
+# ============================================================
+# Pastas geradas na sua máquina
+# ============================================================
 
 # Dados temporários do pipeline
 data/staging/
 
-# Tabelas do painel GiroSUS (geradas pelo script, grandes demais para o Git)
-data/gold/girosus/
+# Tabelas do painel GiroSUS (geradas pelo script)
+data/gold/
 
-# Cache do Python
+# ============================================================
+# Python, testes e editor
+# ============================================================
 __pycache__/
 *.py[cod]
-
-# Cache de testes
 .pytest_cache/
-
-# Ambiente virtual
+.ipynb_checkpoints/
 .venv/
+.env

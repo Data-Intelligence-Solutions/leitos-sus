@@ -9,7 +9,7 @@ COLUNAS_SIH = [
     "N_AIH",
     "IDENT",
     "SEQ_AIH5",
-    "CNES",
+    "CNES",  # código do hospital no CNES; o SIH não tem o nome do hospital
     "MUNIC_RES",
     "MUNIC_MOV",
     "DT_INTER",

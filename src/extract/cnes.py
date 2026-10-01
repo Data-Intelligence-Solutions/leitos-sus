@@ -5,6 +5,7 @@ import pandas as pd
 from src.config import ANOS, CNES_RAW_DIR
 
 # Colunas utilizadas no projeto
+# Os arquivos de leitos (LTGO*) não têm o nome do hospital, só o código CNES.
 COLUNAS_CNES = [
     "CNES",
     "CODUFMUN",
