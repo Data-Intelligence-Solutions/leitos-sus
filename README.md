@@ -885,7 +885,6 @@ O que já existe e o que falta. Legenda: ✅ pronto · ❌ falta.
 * ✅ **Staging** (`data/staging/`): gerada pelo pipeline, só na sua máquina.
 * ✅ **Silver** (`data/silver/`): SIH, CNES e população, conferidas e promovidas por `src/promover_silver.py`.
 * ✅ **Tabelas do painel** (`data/gold/girosus/`): 8 tabelas em CSV, geradas pelo script, só na sua máquina.
-* ❌ **Download automático** dos `.dbc` do DATASUS: hoje é feito à mão no site.
 </details>
 
 <details>
@@ -905,7 +904,6 @@ O que já existe e o que falta. Legenda: ✅ pronto · ❌ falta.
 
 * ✅ **Notebooks 01 a 05**: exploração, consolidação e análise integrada.
 * ✅ **Notebook `06_girosus_ocupacao_leitos`**: análise do GiroSUS, com as 34 perguntas.
-* ❌ **Notebooks 01, 02 e 04** lendo os `.parquet` de `data/raw`: hoje ainda dependem dos `.dbc`.
 </details>
 
 <details>
@@ -923,5 +921,4 @@ O que já existe e o que falta. Legenda: ✅ pronto · ❌ falta.
 * ✅ **Modelo desenhado**: 2 fatos, 6 dimensões, 22 medidas DAX e o parâmetro "Redução %" (no PDF do produto).
 * ❌ **Arquivo `.pbix`** montado.
 * ❌ **Painel publicado**, com link, no Power BI Service.
-* ❌ **Nomes dos hospitais e dos procedimentos** (`dim_hospital.csv` e `dim_procedimento.csv`): hoje o painel mostra só os códigos.
 </details>
